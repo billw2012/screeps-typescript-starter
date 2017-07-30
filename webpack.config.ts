@@ -10,7 +10,7 @@ import { EnvOptions } from "./config";
 function webpackConfig(options: EnvOptions = {}): webpack.Configuration {
   // set some defaults
   _.defaults(options, {
-    ENV: "dev",
+    ENV: "local",
     ROOT: __dirname,
     TEST: false,
   });

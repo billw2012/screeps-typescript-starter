@@ -1,21 +1,28 @@
 {
-  "extends" : [
-    "tslint:recommended"
-  ],
-  "rules": {
-    "forin": false,
-    "interface-name": [false],
-    "no-console": [false],
-    "trailing-comma": [
-      true,
-      "never"
+    "extends": [
+        "tslint:recommended"
     ],
-    "variable-name": [
-      true,
-      "ban-keywords",
-      "check-format",
-      "allow-pascal-case",
-      "allow-leading-underscore"
-    ]
-  }
+    "rules": {
+        "forin": false,
+        "interface-name": [false],
+        "no-console": [false],
+        "trailing-comma": [
+            true,
+            "never"
+        ],
+        "variable-name": [
+            false,
+            "ban-keywords",
+            "check-format",
+            "allow-pascal-case",
+            "allow-leading-underscore"
+        ],
+        "max-classes-per-file": [
+            false
+        ],
+        "no-unused-expression": [
+            false
+        ],
+        "no-bitwise": false
+    }
 }

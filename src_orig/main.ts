@@ -1,5 +1,8 @@
-import {log, LogLevel, settings} from "log";
+import * as CreepManager from "./components/creeps/creepManager";
+import * as Config from "./config/config";
+
 import * as Profiler from "screeps-profiler";
+import { log } from "./lib/logger/log";
 
 // Any code written outside the `loop()` method is executed only when the
 // Screeps system reloads your script.
@@ -11,16 +14,34 @@ import * as Profiler from "screeps-profiler";
 // by setting USE_PROFILER through webpack, if you want to permanently
 // remove it on deploy
 // Start the profiler
-if (settings.profile.enabled) {
+if (Config.USE_PROFILER) {
   Profiler.enable();
 }
 
-log("main", `loading revision: ${__REVISION__}`);
+log.info(`loading revision: ${ __REVISION__ }`);
 
 function mloop() {
   // Check memory for null or out of bounds custom objects
   if (!Memory.uuid || Memory.uuid > 100) {
     Memory.uuid = 0;
+  }
+
+  for (const i in Game.rooms) {
+    const room: Room = Game.rooms[i];
+
+    CreepManager.run(room);
+
+    // Clears any non-existing creep memory.
+    for (const name in Memory.creeps) {
+      const creep: any = Memory.creeps[name];
+
+      if (creep.room === room.name) {
+        if (!Game.creeps[name]) {
+          log.info("Clearing non-existing creep memory:", name);
+          delete Memory.creeps[name];
+        }
+      }
+    }
   }
 }
 
@@ -32,4 +53,4 @@ function mloop() {
  *
  * @export
  */
-export const loop = !settings.profile.enabled ? mloop : () => { Profiler.wrap(mloop); };
+export const loop = !Config.USE_PROFILER ? mloop : () => { Profiler.wrap(mloop); };

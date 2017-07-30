@@ -38,7 +38,7 @@ algorithm:
 
 */
 import { JobFactory } from "jobs/factory";
-import { Job } from "jobs/job";
+import * as Job from "jobs/job";
 import * as _ from "lodash";
 
 /**
@@ -52,9 +52,16 @@ import * as _ from "lodash";
 class JobManager {
     // Registered job factories
     private factories: Map<string, JobFactory> = new Map<string, JobFactory>();
+
     // Active jobs categorised by type and name
     // private jobs: Map<string, Map<string, Job>> = new Map<string, Map<string, Job>>();
-    private jobs: Job[];
+    private get jobs(): Job.Data[] {
+        return Memory.jobs;
+    }
+
+    private set jobs(jobs: Job.Data[]) {
+        Memory.jobs = jobs;
+    }
 
     /**
      * Register new job factories by name
@@ -64,39 +71,41 @@ class JobManager {
     public register_factory(name: string, factory: JobFactory) {
         this.factories.set(name, factory);
     }
+
+    public get_factory_for_job(job: Job.Data): JobFactory {
+        return this.factories.get(job.factory) as JobFactory;
+    }
     /**
      * Perform full update:
-     * 1. Cull dead jobs
-     * 2. Generate new jobs
-     * 3. Sort new jobs by priority
-     * 4. Attempt to assign new jobs in priority order
-     * 5. Add successfully assigned jobs to the active job list
+     * 1. Update jobs
+     * 2. Cull dead jobs
+     * 3. Generate new jobs
+     * 4. Sort new jobs by priority
+     * 5. Attempt to assign new jobs in priority order
+     * 6. Add successfully assigned jobs to the active job list
      */
     public update() {
+        // Update live jobs
+        _.forEach(this.jobs, (job: Job.Data) => this.get_factory_for_job(job).update(job));
+
         // Cull dead jobs
-        this.jobs = _.filter(this.jobs, (job: Job) => job.active);
-        // _.forOwn(this.jobs, (jobMap: Map<string, Job>, type: string) => {
-        //   this.jobs.set(type, _.pick(jobMap, (job: Job) => job.active));
-        // });
-        let all_new_jobs: Job[] = [];
+        this.jobs = _.filter(this.jobs, (job: Job.Data) => job.active);
+        let all_new_jobs: Job.Data[] = [];
+
         // Generate new jobs
         _.forOwn(this.factories, (factory: JobFactory, type: string) => {
-            const active_jobs = _.filter(this.jobs, (job: Job) => job.type === type);
+            const active_jobs = _.filter(this.jobs, (job: Job.Data) => job.type === type);
             const new_jobs = factory.generate_new_jobs(active_jobs);
             all_new_jobs = all_new_jobs.concat(new_jobs);
         });
+
         // Prioritize new jobs
-        _.sortBy(all_new_jobs, (job: Job) => job.priority);
+        _.sortBy(all_new_jobs, (job: Job.Data) => job.priority);
+
         // Attempt to assign new jobs. If successfull then insert them into the active job list
-        _.forEach(all_new_jobs, (job: Job) => {
-            if (job.assign()) {
+        _.forEach(all_new_jobs, (job: Job.Data) => {
+            if (this.get_factory_for_job(job).assign(job)) {
                 this.jobs.push(job);
-                // const active_jobs = this.jobs.get(job.type);
-                // if (!active_jobs) {
-                //   this.jobs.set(job.type, [job]);
-                // } else {
-                //   active_jobs.push(job);
-                // }
             }
         });
     }

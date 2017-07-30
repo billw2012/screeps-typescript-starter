@@ -2,9 +2,8 @@ import * as BodyPartSpec from "jobs/body.part.spec";
 import * as BodySpec from "jobs/body.spec";
 import { JobFactory } from "jobs/factory";
 import * as Job from "jobs/job";
-import * as CreepJob from "jobs/job.creep";
 import * as SpawnJob from "jobs/job.spawn";
-import job_manager from "jobs/manager";
+import { job_manager } from "jobs/manager";
 import { log } from "log";
 import * as CreepMemory from "memory/creep";
 import * as RoomMemory from "memory/room";
@@ -15,27 +14,6 @@ const harvester_body_spec: BodySpec.Data = BodySpec.construct([
     BodyPartSpec.construct(WORK, 2, 1, 40),
     BodyPartSpec.construct(CARRY, 1, 1, 20)
 ]);
-
-// class SpawnHarvesterJob extends SpawnJob {
-//     public generate_body(available_energy: number): string[] {
-//         // TODO: make it better
-//         if (available_energy < BODYPART_COST[])
-//             return [WORK, MOVE, CARRY];
-//     }
-
-//     public init_memory(): any {
-//         //
-//     }
-// };
-
-// class HarvestJob extends CreepJob {
-//     protected update_creep(creep: Creep): void {
-//         throw new Error("Method not implemented.");
-//     }
-//     protected rate(creep: Creep): number {
-//         throw new Error("Method not implemented.");
-//     }
-// }
 
 function need_more_harvesters(room: Room): boolean {
     // Check we don't already have stalled harvesters
@@ -60,43 +38,21 @@ function need_more_harvesters(room: Room): boolean {
     return room_rate < desired_rate;
 }
 
-export const HAVEST_FACTORY: string = "harvest";
-export const SPAWN_HAVESTER: string = "harvest";
+export const SPAWN_HAVEST_FACTORY: string = "spawn_harvest_factory";
+export const SPAWN_HAVESTER_JOB: string = "spawn_harvester_job";
 
 function should_harvest_room(room: Room): boolean {
     // TODO: later we will have flags or metadata to specify external rooms for harvesting
     return (room.controller as Controller).my;
 }
 
-function get_assigned_harvesters(source: Source) {
-    return source.room.find(FIND_MY_CREEPS,
-        { filter: (creep: Creep) => creep.memory.target === source.id });
-}
-
-function required_harvest_jobs(room: Room): number {
-    let count = 0;
-    const room_md = RoomMemory.get_metadata(room);
-    for (const s in room_md.source_spaces) {
-        const source = Game.getObjectById(s) as Source;
-        // Early out on actually having energy to get
-        if (source.energy > 50) {
-            const spaces = room_md.source_spaces[source.id] as number;
-            const assigned_count = get_assigned_harvesters(source).length;
-            if (assigned_count < spaces + 1) {
-                count++;
-            }
-        }
-    }
-    return count;
-}
-
-class HarvestFactory implements JobFactory {
-    public assign(job: Job.Data): void {
-        throw new Error("Method not implemented.");
+class SpawnHarvestFactory implements JobFactory {
+    public assign(job: Job.Data): boolean {
+        return SpawnJob.assign(job as SpawnJob.Data);
     }
 
     public update(job: Job.Data): void {
-        throw new Error("Method not implemented.");
+        SpawnJob.update(job as SpawnJob.Data);
     }
 
     public generate_new_jobs(active_jobs: Job.Data[]): Job.Data[] {
@@ -106,22 +62,18 @@ class HarvestFactory implements JobFactory {
             if (should_harvest_room(room)) {
                 // Account for already active spawn tasks
                 const active_jobs_in_room = _.filter(active_jobs,
-                    (job: Job.Data) => job.room === room.name && job.type === SPAWN_HAVESTER).length;
+                    (job: Job.Data) => job.room === room.name && job.type === SPAWN_HAVESTER_JOB).length;
                 // For now we will only spawn one at a time.
                 if (active_jobs_in_room === 0 && need_more_harvesters(room)) {
                     const new_job = SpawnJob.construct(
-                        SPAWN_HAVESTER,
-                        HAVEST_FACTORY,
+                        SPAWN_HAVESTER_JOB,
+                        SPAWN_HAVEST_FACTORY,
                         room.getPositionAt(0, 0) as RoomPosition,
-                        settings.jobs.priorities.get(SPAWN_HAVESTER) as number,
+                        settings.jobs.priorities.get(SPAWN_HAVESTER_JOB) as number,
                         SpawnJob.Flags.None,
                         harvester_body_spec,
                         "harvester");
                     new_jobs.push(new_job);
-                }
-                const harvest_job_count = required_harvest_jobs(room);
-                for(let i = 0; i < harvest_job_count; ++i) {
-
                 }
             }
         });
@@ -129,4 +81,4 @@ class HarvestFactory implements JobFactory {
     }
 }
 
-job_manager.register_factory(HAVEST_FACTORY, new HarvestFactory());
+job_manager.register_factory(SPAWN_HAVEST_FACTORY, new SpawnHarvestFactory());

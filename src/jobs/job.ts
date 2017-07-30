@@ -1,25 +1,26 @@
-export abstract class Job {
-  public type: string;
-  public id: string;
-  public priority: number = 100;
-  public active: boolean = false;
-  public get pos(): RoomPosition | null {
-    return Game.rooms[this.room].getPositionAt(this.x, this.y);
-  }
+export interface Data {
+    type: string;
+    factory: string;
+    id: string;
+    priority: number;
+    active: boolean;
+    x: number;
+    y: number;
+    room: string;
+}
 
-  private x: number;
-  private y: number;
-  private room: string;
+export function construct(type: string, factory: string, pos: RoomPosition, priority: number): Data {
+    return {
+        factory,
+        id: `${type}:${location}:${priority}:${Math.random()}`,
+        priority,
+        room: pos.roomName,
+        type,
+        x: pos.x,
+        y: pos.y
+    } as Data;
+}
 
-  constructor(type: string, pos: RoomPosition, priority: number) {
-    this.type = type;
-    this.room = pos.roomName;
-    this.x = pos.x;
-    this.y = pos.y;
-    this.priority = priority;
-    this.id = `${type}:${location}:${priority}:${Math.random()}`;
-  }
-
-  public abstract assign(): boolean;
-  public abstract update(): void;
+export function get_pos(this_: Data) {
+    return Game.rooms[this_.room].getPositionAt(this_.x, this_.y);
 }

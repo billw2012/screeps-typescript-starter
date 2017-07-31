@@ -9,15 +9,16 @@ export interface Data {
     room: string;
 }
 
-export function construct(type: string, factory: string, pos: RoomPosition, priority: number): Data {
+export function construct(type: string, factory: string,
+                          room: string, x: number, y: number, priority: number): Data {
     return {
         factory,
-        id: `${type}:${location}:${priority}:${Math.random()}`,
+        id: `${type}:${room}:${x}:${y}:${priority}:${Math.random()}`,
         priority,
-        room: pos.roomName,
+        room,
         type,
-        x: pos.x,
-        y: pos.y
+        x,
+        y
     } as Data;
 }
 

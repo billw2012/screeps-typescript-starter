@@ -27,7 +27,7 @@ export function calculate_body_cost(body: string[]): number {
 }
 
     // Min possible cost for this body specification.
-export function min_cost(this_: Data): number {
+export function get_min_cost(this_: Data): number {
     if (this_.min_cost_cache < 0) {
         this_.min_cost_cache = _.reduce(this_.parts,
             (sum: number, p: BodyPartSpec.Data) => sum + BODYPART_COST[p.part] * p.min, 0);

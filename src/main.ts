@@ -1,4 +1,6 @@
-import {log, LogLevel, settings} from "log";
+import * as JobSpawnHarvester from "jobs/job.spawn.harvester";
+import * as JobManager from "jobs/manager";
+import { log, Settings } from "log";
 import * as Profiler from "screeps-profiler";
 
 // Any code written outside the `loop()` method is executed only when the
@@ -11,17 +13,20 @@ import * as Profiler from "screeps-profiler";
 // by setting USE_PROFILER through webpack, if you want to permanently
 // remove it on deploy
 // Start the profiler
-if (settings.profile.enabled) {
-  Profiler.enable();
+if (Settings.get().profile.enabled) {
+    Profiler.enable();
 }
 
 log("main", `loading revision: ${__REVISION__}`);
 
 function mloop() {
-  // Check memory for null or out of bounds custom objects
-  if (!Memory.uuid || Memory.uuid > 100) {
-    Memory.uuid = 0;
-  }
+    // Check memory for null or out of bounds custom objects
+    if (!Memory.uuid || Memory.uuid > 100) {
+        Memory.uuid = 0;
+    }
+    JobManager.update({
+        [JobSpawnHarvester.FACTORY_NAME]: JobSpawnHarvester.get_factory()
+    });
 }
 
 /**
@@ -32,4 +37,4 @@ function mloop() {
  *
  * @export
  */
-export const loop = !settings.profile.enabled ? mloop : () => { Profiler.wrap(mloop); };
+export const loop = !Settings.get().profile.enabled ? mloop : () => { Profiler.wrap(mloop); };

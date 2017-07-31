@@ -2,8 +2,8 @@ import * as BodySpec from "jobs/body.spec";
 import * as Job from "jobs/job";
 import * as _ from "lodash";
 import * as CreepMemory from "memory/creep";
-import { settings } from "settings";
-import * as utils from "utils";
+import * as Settings from "settings";
+// import * as utils from "utils";
 
 export enum SpawnerJobState {
     Spawning,
@@ -40,9 +40,9 @@ export interface Data extends Job.Data {
     state: SpawnerJobState;
 }
 
-export function construct(type: string, factory: string, pos: RoomPosition, priority: number,
+export function construct(type: string, factory: string, room: string, x: number, y: number, priority: number,
                           flags: Flags, body_spec: BodySpec.Data, role: string): Data {
-    const base = Job.construct(type, factory, pos, priority) as Data;
+    const base = Job.construct(type, factory, room, x, y, priority) as Data;
     base.assigned_spawner = "";
     base.creep_name = undefined;
     base.flags = flags;
@@ -68,12 +68,12 @@ function default_rate(this_: Data, spawn: Spawn): number {
             return 0;
         }
         dist = Game.map.getRoomLinearDistance(position.roomName, spawn.room.name) *
-            settings.spawner.room_distance_cost_multipler;
-    } else { // Use pathing inside a single room
+            Settings.get().spawner.room_distance_cost_multipler;
+    } else if (position) { // Use pathing inside a single room
         dist = position.findPathTo(spawn.pos).length;
     }
     // Made up equation to balance cost and distance. Use
-    return 1 / (dist * settings.spawner.distance_cost_multiplier) + energy_diff;
+    return 1 / (dist * Settings.get().spawner.distance_cost_multiplier) + energy_diff;
 }
 
 export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = default_rate ): boolean {
@@ -152,12 +152,12 @@ export function update(this_: Data): void {
                 // If we are in the correct room and within a reasonable distance of
                 // the target then call it a job well done.
                 if (creep.room.name === target_pos.roomName
-                    && creep.pos.inRangeTo(target_pos, settings.spawner.move_to_position_range)) {
+                    && creep.pos.inRangeTo(target_pos, Settings.get().spawner.move_to_position_range)) {
                     this_.state = SpawnerJobState.Done;
                 } else {
                     // Try a move
                     const move_result = creep.moveTo(target_pos,
-                        { visualizePathStyle: settings.spawner.path_style });
+                        { visualizePathStyle: Settings.get().spawner.path_style as any });
                     // If we failed to move for some reason other than being le tired.
                     if (move_result !== OK && move_result !== ERR_TIRED) {
                         this_.state = SpawnerJobState.Failed;

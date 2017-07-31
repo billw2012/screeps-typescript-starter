@@ -1,9 +1,10 @@
-import {LogLevel, settings} from "settings";
+import * as _ from "lodash";
+import * as Settings from "settings";
 
-export {LogLevel, settings};
+export { Settings };
 
-export function log(tag: string, o: any, level: LogLevel = LogLevel.INFO): void {
-  if (settings.debug.log.is_enabled(tag, level)) {
-    console.log(`${tag}: ${o}`);
-  }
+export function log(tag: string, o: any, level: Settings.LogLevel = Settings.LogLevel.INFO): void {
+    if (Settings.get().debug.log.min_level <= level && _.contains(Settings.get().debug.log.enabled, tag)) {
+        console.log(`${tag}: ${o}`);
+    }
 }

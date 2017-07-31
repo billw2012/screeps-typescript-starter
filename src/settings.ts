@@ -7,64 +7,146 @@
  * mod.thing == 'a thing'; // true
  */
 export enum LogLevel {
-  TRACE,
-  DEBUG,
-  INFO,
-  WARNING,
-  ERROR
+    TRACE,
+    DEBUG,
+    INFO,
+    WARNING,
+    ERROR
 }
 
-class LogSettings {
-  public enabled: Map<string, boolean> = new Map<string, boolean>([
-    ["spawn", true],
-    ["stats", true],
-    ["harvester", true]
-  ]);
-  public min_level: LogLevel = LogLevel.INFO;
-  public is_enabled(tag: string, level: LogLevel): boolean {
-    return this.enabled.get(tag) === true && level >= this.min_level;
-  }
+interface LogSettings {
+    enabled: string[];
+    min_level: LogLevel;
 }
 
-class DebugSettings {
-  public log: LogSettings;
+interface DebugSettings {
+    log: LogSettings;
 }
 
-class HarvesterSettings {
-  // tslint:disable-next-line:variable-name
-  public rate_measure_period: number = 30;
+interface HarvesterSettings {
+    rate_measure_period: number;
 }
 
-class JobsSettings {
-  public priorities: Map<string, number> = new Map<string, number>([
-      ["harvest", 1]
-    ]);
+interface JobPriorities {
+    harvest_spawn: number;
+    harvest: number;
 }
 
-class ProfileSettings {
-  public enabled: boolean = false;
+interface JobsSettings {
+    priorities: JobPriorities;
 }
 
-class SpawnerSettings {
-  public harvester_scale: number = 1.5;
-  public room_distance_cost_multipler: number = 200;
-  public distance_cost_multiplier: number = 1;
-  public path_style: any = {
-    fill: "transparent",
-    lineStyle: "dashed",
-    opacity: .1,
-    stroke: "#fff",
-    strokeWidth: .15
-  };
-  public move_to_position_range: number = 5;
+interface ProfileSettings {
+    enabled: boolean;
 }
 
-class Settings {
-  public debug: DebugSettings;
-  public harvester: HarvesterSettings;
-  public jobs: JobsSettings;
-  public profile: ProfileSettings;
-  public spawner: SpawnerSettings;
+interface PathStyle {
+    fill: string;
+    lineStyle: string;
+    opacity: number;
+    stroke: string;
+    strokeWidth: number;
 }
 
-export const settings = new Settings();
+interface SpawnerSettings {
+    distance_cost_multiplier: number;
+    harvester_scale: number;
+    move_to_position_range: number;
+    path_style: PathStyle;
+    room_distance_cost_multipler: number;
+}
+
+interface Settings {
+    debug: DebugSettings;
+    harvester: HarvesterSettings;
+    jobs: JobsSettings;
+    profile: ProfileSettings;
+    spawner: SpawnerSettings;
+}
+
+export function reset() {
+    Memory.settings = {
+        version: __REVISION__,
+        // tslint:disable-next-line:object-literal-sort-keys
+        debug: {
+            log: {
+                enabled: [
+                    "main",
+                    "job.spawn.harvester",
+                    "manager"
+                ],
+                min_level: LogLevel.INFO
+            }
+        },
+        harvester: {
+            rate_measure_period: 30
+        },
+        jobs: {
+            priorities: {
+                harvest: 1,
+                harvest_spawn: 1
+            }
+        },
+        profile: {
+            enabled: false
+        },
+        spawner: {
+            distance_cost_multiplier: 1,
+            harvester_scale: 1.5,
+            move_to_position_range: 5,
+            path_style: {
+                fill: "transparent",
+                lineStyle: "dashed",
+                opacity: .1,
+                stroke: "#fff",
+                strokeWidth: .15
+            },
+            room_distance_cost_multipler: 200
+        }
+    };
+}
+export function get() {
+    if (!Memory.settings || Memory.settings.version !== __REVISION__) {
+        reset();
+    }
+    return Memory.settings as Settings;
+}
+
+// export const settings = {
+//     debug: {
+//         log: {
+//             enabled: [
+//                 "main",
+//                 "harvester",
+//                 "spawn",
+//                 "stats"
+//             ],
+//             min_level: LogLevel.INFO
+//         }
+//     },
+//     harvester: {
+//         rate_measure_period: 30
+//     },
+//     jobs: {
+//         priorities: {
+//             harvest: 1,
+//             harvest_spawn: 1
+//         }
+//     },
+//     profile: {
+//         enabled: false
+//     },
+//     spawner: {
+//         distance_cost_multiplier: 1,
+//         harvester_scale: 1.5,
+//         move_to_position_range: 5,
+//         path_style: {
+//             fill: "transparent",
+//             lineStyle: "dashed",
+//             opacity: .1,
+//             stroke: "#fff",
+//             strokeWidth: .15
+//         },
+//         room_distance_cost_multipler: 200
+//     }
+// } as Settings;

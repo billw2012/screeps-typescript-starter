@@ -1,4 +1,6 @@
+import * as JobHarvest from "jobs/job.harvest";
 import * as JobSpawnHarvester from "jobs/job.spawn.harvester";
+import * as JobStopBlocking from "jobs/job.stopblocking";
 import * as JobManager from "jobs/manager";
 import { log, Settings } from "log";
 import * as Profiler from "screeps-profiler";
@@ -24,8 +26,11 @@ function mloop() {
     if (!Memory.uuid || Memory.uuid > 100) {
         Memory.uuid = 0;
     }
+
     JobManager.update({
-        [JobSpawnHarvester.FACTORY_NAME]: JobSpawnHarvester.get_factory()
+        [JobSpawnHarvester.FACTORY_NAME]: JobSpawnHarvester.get_factory(),
+        [JobHarvest.FACTORY_NAME]: JobHarvest.get_factory(),
+        [JobStopBlocking.FACTORY_NAME]: JobStopBlocking.get_factory()
     });
 }
 

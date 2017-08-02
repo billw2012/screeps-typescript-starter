@@ -1,6 +1,7 @@
 import * as BodySpec from "jobs/body.spec";
 import * as Job from "jobs/job";
 import * as _ from "lodash";
+import { log } from "log";
 import * as CreepMemory from "memory/creep";
 import * as Settings from "settings";
 // import * as utils from "utils";
@@ -40,9 +41,9 @@ export interface Data extends Job.Data {
     state: SpawnerJobState;
 }
 
-export function construct(type: string, factory: string, room: string, x: number, y: number, priority: number,
-                          flags: Flags, body_spec: BodySpec.Data, role: string): Data {
-    const base = Job.construct(type, factory, room, x, y, priority) as Data;
+export function construct(type: string, factory: string, room: string, x: number, y: number, flags: Flags,
+                          body_spec: BodySpec.Data, role: string, priority?: number, ttl?: number): Data {
+    const base = Job.construct(type, factory, room, x, y, priority, ttl) as Data;
     base.assigned_spawner = "";
     base.creep_name = undefined;
     base.flags = flags;
@@ -76,7 +77,7 @@ function default_rate(this_: Data, spawn: Spawn): number {
     return 1 / (dist * Settings.get().spawner.distance_cost_multiplier) + energy_diff;
 }
 
-export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = default_rate ): boolean {
+export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = default_rate): boolean {
     let best: { rating: number, spawn?: Spawn } = { rating: 0, spawn: undefined };
     _.forOwn(Game.spawns, (spawn: Spawn) => {
         if (spawn.my && !spawn.spawning) {
@@ -96,7 +97,10 @@ export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = 
         const body = BodySpec.generate(this_.body_spec, best_spawn.room.energyAvailable);
         // Its possible to fail to make the body
         if (body) {
-            const result = best_spawn.createCreep(body, this_.creep_name);
+            const this_pos = Job.get_pos(this_) as RoomPosition;
+            const result = best_spawn.createCreep(body, this_.creep_name, {
+                data: CreepMemory.construct(this_pos ? this_pos.roomName : best_spawn.room.name, this_.id, this_.role)
+            });
             if (result as string) {
                 this_.assigned_spawner = best_spawn.name;
                 this_.creep_name = result as string;
@@ -109,6 +113,12 @@ export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = 
     return false;
 }
 
+function draw_spawn_message(this_: Data, spawner: Spawn): void {
+    const percent_complete = (1 - spawner.spawning.remainingTime / spawner.spawning.needTime) * 100;
+    spawner.room.visual.text(`🛠️ ${this_.role} ${percent_complete.toFixed(0)}%`,
+        spawner.pos.x + 1, spawner.pos.y, { align: "left", opacity: 0.8 });
+}
+
 export function update(this_: Data): void {
     switch (this_.state) {
         // Spawning in progress. Can transition to MovingToPositon or Failed.
@@ -116,31 +126,28 @@ export function update(this_: Data): void {
             const spawner = Game.spawns[this_.assigned_spawner];
             // If something happened to the spawner then we failed this_ job
             if (!spawner) {
+                log("job.spawn", `Failed to spawn ${this_.creep_name}: spawner doesn't exist`, Settings.LogLevel.WARNING);
                 this_.state = SpawnerJobState.Failed;
                 // If spawner is not spawning, or is spawning something else then we should have finished.
             } else if (!spawner.spawning || spawner.spawning.name !== this_.creep_name) {
-                // If the actual creep doesn't exist then we failed, not sure how this_ could happen
+                // If the actual creep doesn't exist then we failed, not sure how this could happen
                 if (!Game.creeps[this_.creep_name as string]) {
+                    log("job.spawn", `Failed to spawn ${this_.creep_name}`, Settings.LogLevel.ERROR);
                     this_.state = SpawnerJobState.Failed;
                 } else {
                     // Initialize the creeps memory
-                    const new_creep = Game.creeps[this_.creep_name as string];
-                    const creep_mem = CreepMemory.get(new_creep);
-                    creep_mem.role = this_.role;
-                    // Set the creeps home room
-                    const this_pos = Job.get_pos(this_) as RoomPosition;
-                    if (this_pos) {
-                        creep_mem.home_room = this_pos.roomName;
-                    } else {
-                        creep_mem.home_room = spawner.room.name;
-                    }
+                    const creep = Game.creeps[this_.creep_name as string];
                     // Change to next state
                     if (this_.flags & Flags.MoveToPosition) {
                         this_.state = SpawnerJobState.MovingToPosition;
+                        creep.say(`⏫ ${creep.name} (${this_.role}) moving to position`);
                     } else {
                         this_.state = SpawnerJobState.Done;
+
                     }
                 }
+            } else {
+                draw_spawn_message(this_, spawner);
             }
             break;
         }
@@ -157,25 +164,53 @@ export function update(this_: Data): void {
                 } else {
                     // Try a move
                     const move_result = creep.moveTo(target_pos,
-                        { visualizePathStyle: Settings.get().spawner.path_style as any });
+                        { visualizePathStyle: Settings.get().path_styles.spawned as any });
                     // If we failed to move for some reason other than being le tired.
                     if (move_result !== OK && move_result !== ERR_TIRED) {
+                        log("job.spawn", `${creep.name} failed to move to target position ${JSON.stringify(target_pos)}`, Settings.LogLevel.WARNING);
                         this_.state = SpawnerJobState.Failed;
+                        creep.say(`🔺 ${creep.name} failed to move to position`);
                     }
                 }
             } else {
                 // Dunno what is going on, we failed.
+                log("job.spawn", `${creep.name} failed to move to target position: unknown error, creep and/or target_pos are invalid`, Settings.LogLevel.WARNING);
                 this_.state = SpawnerJobState.Failed;
+                creep.say(`🔺 ${creep.name} failed to move to position`);
             }
             break;
         }
         case SpawnerJobState.Done: {
+            const creep = Game.creeps[this_.creep_name as string];
+            if (creep) {
+                creep.say(`💤 ${creep.name} (${this_.role}) ready`);
+                const creep_mem = CreepMemory.get(creep);
+                delete creep_mem.job;
+            }
             this_.active = false;
             break;
         }
         case SpawnerJobState.Failed: {
+            const creep = Game.creeps[this_.creep_name as string];
+            if (creep) {
+                const creep_mem = CreepMemory.get(creep);
+                delete creep_mem.job;
+            }
             this_.active = false;
             break;
         }
     }
+}
+
+export function kill(this_: Data): boolean {
+    // If the assigned_spawner or the creep name isn't set then we can immediately kill
+    if (!this_.assigned_spawner || !this_.creep_name) {
+        return true;
+    }
+    const spawn = Game.spawns[this_.assigned_spawner];
+    // if the spawn isn't valid, or it isn't spawning the creep we expect then we can kill
+    if (!spawn || !spawn.spawning || spawn.spawning.name !== this_.creep_name) {
+        return true;
+    }
+    return false;
 }

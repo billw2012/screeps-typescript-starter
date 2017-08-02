@@ -2,6 +2,8 @@ import * as _ from "lodash";
 import { log } from "log";
 import * as CreepMemory from "memory/creep";
 
+export const ROOM_SIZE = 50;
+
 export interface MetaData {
     source_spaces: any;
 }

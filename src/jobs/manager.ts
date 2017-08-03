@@ -128,19 +128,19 @@ export function update(factories: Factories) {
     // Update live jobs
     _.forEach(jobs, (job: Job.Data) => get_factory_for_job(factories, job).update(job));
 
-    // // Kill expired jobs
-    // _.forEach(jobs, (job: Job.Data) => {
-    //     // Might already be done...
-    //     if (job.active) {
-    //         const ttl = get_ttl(job);
-    //         if (Game.time - job.created > ttl) {
-    //             if (get_factory_for_job(factories, job).kill(job)) {
-    //                 log("manager", `Killed expired job ${job.id}`, Settings.LogLevel.WARNING);
-    //                 job.active = false;
-    //             }
-    //         }
-    //     }
-    // });
+    // Kill expired jobs
+    _.forEach(jobs, (job: Job.Data) => {
+        // Might already be done...
+        if (job.active) {
+            const ttl = get_ttl(job);
+            if (Game.time - job.created > ttl) {
+                if (get_factory_for_job(factories, job).kill(job)) {
+                    log("manager", `Killed expired job ${job.id}`, Settings.LogLevel.WARNING);
+                    job.active = false;
+                }
+            }
+        }
+    });
 
     // Update job stats
     _.forEach(jobs, update_job_stats);

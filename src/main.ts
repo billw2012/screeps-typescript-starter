@@ -1,3 +1,4 @@
+import * as JobConstructExtension from "jobs/job.construct.extension";
 import * as JobHarvest from "jobs/job.harvest";
 import * as JobSpawnHarvester from "jobs/job.spawn.harvester";
 import * as JobStopBlocking from "jobs/job.stopblocking";
@@ -30,7 +31,8 @@ function mloop() {
     JobManager.update({
         [JobSpawnHarvester.FACTORY_NAME]: JobSpawnHarvester.get_factory(),
         [JobHarvest.FACTORY_NAME]: JobHarvest.get_factory(),
-        [JobStopBlocking.FACTORY_NAME]: JobStopBlocking.get_factory()
+        [JobStopBlocking.FACTORY_NAME]: JobStopBlocking.get_factory(),
+        [JobConstructExtension.FACTORY_NAME]: JobConstructExtension.get_factory(),
     });
 }
 

@@ -3,8 +3,7 @@ import * as Job from "jobs/job";
 import * as JobCreep from "jobs/job.creep";
 import { log, Settings } from "log";
 import * as CreepMemory from "memory/creep";
-import { ROOM_SIZE } from "memory/room";
-import { same_pos } from "utils";
+import * as Utils from "utils";
 
 export const FACTORY_NAME: string = "stopblocking_factory";
 export const JOB_NAME: string = "stopblocking_job";
@@ -38,7 +37,7 @@ function get_blocking_creeps(pos: RoomPosition): Creep[] {
 function assign(job: Job.Data): boolean {
     return JobCreep.assign(job as JobCreep.Data, (_job: JobCreep.Data, creep: Creep): number => {
         const blocked_pos = Job.get_pos(job) as RoomPosition;
-        if (same_pos(blocked_pos, creep.pos)) {
+        if (Utils.same_pos(blocked_pos, creep.pos)) {
             return 1;
         }
         return 0;
@@ -58,49 +57,49 @@ function log_progress(job: JobCreep.Data, creep: Creep, mem: StopBlockingMemory,
     log("job.stopblocking", `[${creep.name}|${job.id}|${mem.state}]: ${msg}`);
 }
 
-function is_unblocked(x: number, y: number, roomName: string) {
-    if (x < 0 || y < 0 || x >= ROOM_SIZE || y >= ROOM_SIZE) {
-        return false;
-    }
-    return Game.map.getTerrainAt(x, y, roomName) !== "wall";
-}
+// function is_unblocked(x: number, y: number, roomName: string) {
+//     if (x < 0 || y < 0 || x >= ROOM_SIZE || y >= ROOM_SIZE) {
+//         return false;
+//     }
+//     return Game.map.getTerrainAt(x, y, roomName) !== "wall";
+// }
 
-function get_free_space(from: RoomPosition): RoomPosition | null {
-    const dist_scale = 2;
-    const room = Game.rooms[from.roomName];
-    // Boxsearch
-    for (let dist = 2; dist < 20; ++dist) {
-        const dists = dist * dist_scale;
-        for (let i = -dist; i < dist; ++i) {
-            const ii = i * dist_scale;
-            const iix = ii + from.x;
-            const iiy = ii + from.y;
-            // Top side
-            if (is_unblocked(iix, -dists + from.y, from.roomName)) {
-                return room.getPositionAt(iix, -dists + from.y);
-            }
-            // Bottom side
-            if (is_unblocked(iix, dists + from.y, from.roomName)) {
-                return room.getPositionAt(iix, dists + from.y);
-            }
-            // Left side
-            if (is_unblocked(dists + from.x, iiy, from.roomName)) {
-                return room.getPositionAt(dists + from.x, iiy);
-            }
-            // Right side
-            if (is_unblocked(-dists + from.x, iiy, from.roomName)) {
-                return room.getPositionAt(-dists + from.x, iiy);
-            }
-        }
-    }
-    return null;
-}
+// function get_free_space(from: RoomPosition): RoomPosition | null {
+//     const dist_scale = 2;
+//     const room = Game.rooms[from.roomName];
+//     // Boxsearch
+//     for (let dist = 2; dist < 20; ++dist) {
+//         const dists = dist * dist_scale;
+//         for (let i = -dist; i < dist; ++i) {
+//             const ii = i * dist_scale;
+//             const iix = ii + from.x;
+//             const iiy = ii + from.y;
+//             // Top side
+//             if (is_unblocked(iix, -dists + from.y, from.roomName)) {
+//                 return room.getPositionAt(iix, -dists + from.y);
+//             }
+//             // Bottom side
+//             if (is_unblocked(iix, dists + from.y, from.roomName)) {
+//                 return room.getPositionAt(iix, dists + from.y);
+//             }
+//             // Left side
+//             if (is_unblocked(dists + from.x, iiy, from.roomName)) {
+//                 return room.getPositionAt(dists + from.x, iiy);
+//             }
+//             // Right side
+//             if (is_unblocked(-dists + from.x, iiy, from.roomName)) {
+//                 return room.getPositionAt(-dists + from.x, iiy);
+//             }
+//         }
+//     }
+//     return null;
+// }
 
 function update_internal(job: JobCreep.Data, creep: Creep): void {
     const mem = get_mem(creep);
     switch (mem.state) {
         case State.UNKNOWN: {
-            const free_space = get_free_space(Job.get_pos(job) as RoomPosition) as RoomPosition;
+            const free_space = Utils.box_search(Job.get_pos(job) as RoomPosition, Utils.no_wall) as RoomPosition;
             if (!free_space) {
                 log("job.stopblocking", "Couldn't find free space to move to!", Settings.LogLevel.WARNING);
                 creep.say("🔺no space");

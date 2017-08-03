@@ -76,12 +76,16 @@ interface ProfileSettings {
     enabled: boolean;
 }
 
+interface SpawnLimits {
+    [key: string]: number;
+}
 interface SpawnerSettings {
     distance_cost_multiplier: number;
     harvester_scale: number;
     move_to_position_range: number;
     path_style: PathStyle;
     room_distance_cost_multipler: number;
+    per_room_limits: SpawnLimits;
 }
 
 interface Settings {
@@ -94,7 +98,7 @@ interface Settings {
     spawner: SpawnerSettings;
 }
 
-const CURRENT_VERSION = 13;
+const CURRENT_VERSION = 15;
 export function reset() {
     Memory.settings = {
         version: CURRENT_VERSION,
@@ -107,10 +111,11 @@ export function reset() {
                     "job.spawn.harvester",
                     "job.harvest",
                     "job.creep",
+                    "job.construct",
                     "creep",
                     "manager"
                 ],
-                min_level: LogLevel.WARNING
+                min_level: LogLevel.INFO
             }
         },
         harvester: {
@@ -167,7 +172,11 @@ export function reset() {
             distance_cost_multiplier: 1,
             harvester_scale: 1.5,
             move_to_position_range: 5,
-            room_distance_cost_multipler: 200
+            per_room_limits: {
+                builder: 10,
+                harvester: 20,
+            },
+            room_distance_cost_multipler: 200,
         }
     };
 }

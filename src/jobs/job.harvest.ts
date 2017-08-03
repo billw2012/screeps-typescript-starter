@@ -47,7 +47,8 @@ enum State {
     HS_SEARCHING_FOR_SOURCE,
     HS_GOING_TO_SOURCE,
     HS_HARVESTING,
-    HS_GOING_TO_DEPOSIT
+    HS_GOING_TO_DEPOSIT,
+    HS_GOING_TO_CONTROLLER
 }
 
 // function get_assigned_harvesters(source: Source): Creep[] {
@@ -133,6 +134,24 @@ function log_progress(job: JobCreep.Data, creep: Creep, mem: HarvesterMemory, ms
 
 function update_internal(job: JobCreep.Data, creep: Creep): void {
     const mem = get_mem(creep);
+    const move_to_target = (target: Creep | Structure) => {
+        switch (creep.transfer(target, RESOURCE_ENERGY)) {
+            case ERR_NOT_ENOUGH_RESOURCES:
+                creep.say("💤");
+                calc_new_rate(creep);
+                job.active = false;
+                log_progress(job, creep, mem, "Done");
+                break;
+            case ERR_NOT_IN_RANGE:
+                creep.moveTo(target, { visualizePathStyle: Settings.get().path_styles.harvester_inbound as any });
+                break;
+            case ERR_FULL:
+                creep.say("🚫❔ full");
+                log_progress(job, creep, mem, `Target full`);
+                break;
+            default:
+        }
+    };
 
     // log.log('harvester', 'updating creep ' + creep.name + ' in state ' + JSON.stringify(mem));
     switch (mem.state) {
@@ -158,7 +177,7 @@ function update_internal(job: JobCreep.Data, creep: Creep): void {
                 creep.say("🔁 harvest");
                 log_progress(job, creep, mem, "At source");
             } else {
-                creep.moveTo(source, {visualizePathStyle: Settings.get().path_styles.harvester_outbound as any});
+                creep.moveTo(source, { visualizePathStyle: Settings.get().path_styles.harvester_outbound as any });
             }
             break;
         }
@@ -186,32 +205,26 @@ function update_internal(job: JobCreep.Data, creep: Creep): void {
                 target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
                     filter: (structure: any) => {
                         return (structure.structureType === STRUCTURE_EXTENSION || structure.structureType === STRUCTURE_SPAWN) &&
-                               structure.energy < structure.energyCapacity;
+                            structure.energy < structure.energyCapacity;
                     }
                 });
             }
             if (!target) {
-                target = creep.room.controller;
-                log_progress(job, creep, mem, "Couldn't find a spawn or extension, reverting to room controller");
-            }
-
-            switch (creep.transfer(target, RESOURCE_ENERGY)) {
-                case ERR_NOT_ENOUGH_RESOURCES:
-                    creep.say("💤");
-                    calc_new_rate(creep);
-                    job.active = false;
-                    log_progress(job, creep, mem, "Done");
-                    break;
-                case ERR_NOT_IN_RANGE:
-                    creep.moveTo(target, {visualizePathStyle: Settings.get().path_styles.harvester_inbound as any});
-                    break;
-                case ERR_FULL:
-                    creep.say("🚫❔ full");
-                    log_progress(job, creep, mem, `Target full`);
-                    break;
-                default:
+                if (creep.room.controller && creep.room.controller.my) {
+                    log_progress(job, creep, mem, "Couldn't find a spawn or extension, reverting to room controller");
+                    mem.state = State.HS_GOING_TO_CONTROLLER;
+                }
+            } else {
+                move_to_target(target);
             }
             break;
+        }
+        case State.HS_GOING_TO_CONTROLLER: {
+            if (!creep.room.controller || !creep.room.controller.my) {
+                mem.state = State.HS_GOING_TO_DEPOSIT;
+            } else {
+                move_to_target(creep.room.controller);
+            }
         }
     }
 }

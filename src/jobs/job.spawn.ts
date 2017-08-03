@@ -78,6 +78,16 @@ function default_rate(this_: Data, spawn: Spawn): number {
 }
 
 export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = default_rate): boolean {
+    // Check how many already spawned for this role for this room
+    const role_in_room = _.sum(Game.creeps, (creep: Creep) => {
+        const mem = CreepMemory.get(creep);
+        return (mem.home_room === this_.room && mem.role === this_.role) ? 1 : 0;
+    });
+    // Clamp against the limit in settings
+    if (role_in_room > Settings.get().spawner.per_room_limits[this_.role]) {
+        return false;
+    }
+
     let best: { rating: number, spawn?: Spawn } = { rating: 0, spawn: undefined };
     _.forOwn(Game.spawns, (spawn: Spawn) => {
         if (spawn.my && !spawn.spawning) {

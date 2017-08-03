@@ -49,7 +49,10 @@ export function update(this_: Data, auto_pos?: (job: Data) => RoomPosition | nul
     if (!room_pos) {
         log("job.construct", `Construct job ${this_.id} failed: couldn't find position`, Settings.LogLevel.ERROR);
     } else {
-        Game.rooms[room_pos.roomName].createConstructionSite(room_pos, this_.structure_type);
+        const res = Game.rooms[room_pos.roomName].createConstructionSite(room_pos, this_.structure_type);
+        if (res !== OK) {
+            log("job.construct", `Construct job ${this_.id} of ${this_.structure_type} at ${room_pos.roomName},${room_pos.x},${room_pos.y} failed with code ${res}`, Settings.LogLevel.ERROR);
+        }
     }
 
     this_.active = false;

@@ -33,7 +33,7 @@ function get_blocking_creeps(pos: RoomPosition): Creep[] {
 function assign(job: Job.Data): boolean {
     return JobCreep.assign(job as JobCreep.Data, (_job: JobCreep.Data, creep: Creep): number => {
         const blocked_pos = Job.get_pos(job) as RoomPosition;
-        if (Utils.same_pos(blocked_pos, creep.pos)) {
+        if (Utils.same_room_pos(blocked_pos, creep.pos)) {
             return 1;
         }
         return 0;

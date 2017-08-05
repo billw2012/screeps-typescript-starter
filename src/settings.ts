@@ -35,6 +35,7 @@ export interface DebugSettings {
 
 export interface HarvesterSettings {
     rate_measure_period: number;
+    controller_downgrade_ticks: number;
 }
 
 export interface JobSetting {
@@ -96,6 +97,10 @@ export interface StatsSettings {
     desired_rally_points: number;
     open_space_min: number;
     open_space_max: number;
+    space_around_spawns: number;
+    space_around_rally_points: number;
+    space_around_controllers: number;
+    space_around_sources: number;
 }
 
 export interface ConstructionSettings {
@@ -114,7 +119,7 @@ export interface Settings {
     construct: ConstructionSettings;
 }
 
-const CURRENT_VERSION = 21;
+const CURRENT_VERSION = 25;
 export function reset() {
     Memory.settings = {
         version: CURRENT_VERSION,
@@ -123,21 +128,22 @@ export function reset() {
             log: {
                 enabled: [
                     "settings",
-                    "main",
-                    "job.spawn.harvester",
-                    "job.harvest",
-                    "job.creep",
-                    "job.spawn",
-                    "job.construct",
-                    "creep",
-                    "manager",
+                    // "main",
+                    // "job.spawn.harvester",
+                    // "job.harvest",
+                    // "job.creep",
+                    // "job.spawn",
+                    // "job.construct",
+                    // "creep",
+                    // "manager",
                     "metadata"
                 ],
                 min_level: LogLevel.INFO
             }
         },
         harvester: {
-            rate_measure_period: 30
+            controller_downgrade_ticks: 200,
+            rate_measure_period: 30,
         },
         jobs: {
             default: { priority: 1, ttl: 200 },
@@ -147,12 +153,12 @@ export function reset() {
             stopblocking_job: { priority: 2, ttl: 50 },
         },
         factories: {
-            construct_extension_factory:  { interval: 1 },
+            construct_extension_factory: { interval: 1 },
             default: { interval: 1 },
-            harvest_factory:  { interval: 1 },
-            spawn_builder_factory:  { interval: 1 },
-            spawn_harvest_factory:  { interval: 1 },
-            stopblocking_factory:  { interval: 1 }
+            harvest_factory: { interval: 1 },
+            spawn_builder_factory: { interval: 1 },
+            spawn_harvest_factory: { interval: 1 },
+            stopblocking_factory: { interval: 1 }
         },
         path_styles: {
             builder_inbound: {
@@ -209,6 +215,10 @@ export function reset() {
             open_space_max: 6,
             open_space_min: 1,
             scan_cpu_cap: 0.2,
+            space_around_controllers: 4,
+            space_around_rally_points: 3,
+            space_around_sources: 4,
+            space_around_spawns: 4,
         },
         construct: {
             extension_spacing: 1

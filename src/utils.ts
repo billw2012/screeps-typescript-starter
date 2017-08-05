@@ -1,4 +1,6 @@
-import { ROOM_SIZE } from "memory/room";
+import * as pos from "pos";
+
+export const ROOM_SIZE = 50;
 
 /**
  * Clamp x between a and b
@@ -10,7 +12,7 @@ export function clamp(x: number, a: number, b: number): number {
     return Math.max(Math.min(x, b), a);
 }
 
-export function same_pos(a: RoomPosition, b: RoomPosition): boolean {
+export function same_room_pos(a: RoomPosition, b: RoomPosition): boolean {
     return a.roomName === b.roomName && a.x === b.x && a.y === b.y;
 }
 
@@ -28,31 +30,29 @@ export function no_wall(x: number, y: number, room: Room) {
     return Game.map.getTerrainAt(x, y, room.name) !== "wall";
 }
 
-export function box_search(from: RoomPosition, pred: (x: number, y: number, room: Room) => boolean, dist_scale: number = 2,
-                           dist_min: number = 2, dist_max: number = 20): RoomPosition | null {
-    const room = Game.rooms[from.roomName];
+export function box_search(x: number, y: number, pred: (x: number, y: number) => boolean, dist_scale: number = 2, dist_min: number = 2, dist_max: number = 20): pos.Pos | null {
     // Boxsearch
     for (let dist = dist_min; dist < dist_max; ++dist) {
         const dists = dist * dist_scale;
         for (let i = -dist; i < dist; ++i) {
             const ii = i * dist_scale;
-            const iix = ii + from.x;
-            const iiy = ii + from.y;
+            const iix = ii + x;
+            const iiy = ii + y;
             // Top side
-            if (pred(iix, -dists + from.y, room)) {
-                return room.getPositionAt(iix, -dists + from.y);
+            if (pred(iix, -dists + y)) {
+                return pos.make_pos(iix, -dists + y);
             }
             // Bottom side
-            if (pred(iix, dists + from.y, room)) {
-                return room.getPositionAt(iix, dists + from.y);
+            if (pred(iix, dists + y)) {
+                return pos.make_pos(iix, dists + y);
             }
             // Left side
-            if (pred(dists + from.x, iiy, room)) {
-                return room.getPositionAt(dists + from.x, iiy);
+            if (pred(dists + x, iiy)) {
+                return pos.make_pos(dists + x, iiy);
             }
             // Right side
-            if (pred(-dists + from.x, iiy, room)) {
-                return room.getPositionAt(-dists + from.x, iiy);
+            if (pred(-dists + x, iiy)) {
+                return pos.make_pos(-dists + x, iiy);
             }
         }
     }

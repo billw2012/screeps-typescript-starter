@@ -5,8 +5,8 @@ import * as Job from "jobs/job";
 import * as SpawnJob from "jobs/job.spawn";
 import { log } from "log";
 import * as CreepMemory from "memory/creep";
-import * as RoomMemory from "memory/room";
-import * as Settings from "settings";
+// import * as RoomMemory from "memory/room";
+// import * as Settings from "settings";
 
 export const FACTORY_NAME: string = "spawn_harvest_factory";
 export const JOB_NAME: string = "spawn_harvester_job";
@@ -15,7 +15,7 @@ export const ROLE_NAME: string = "harvester";
 // Body spec
 const body_spec: BodySpec.Data = BodySpec.construct([
     BodyPartSpec.construct(MOVE, 1, 1, 20),
-    BodyPartSpec.construct(WORK, 2, 1, 40),
+    BodyPartSpec.construct(WORK, 1, 1, 20),
     BodyPartSpec.construct(CARRY, 1, 1, 20)
 ]);
 

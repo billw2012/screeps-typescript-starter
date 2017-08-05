@@ -1,7 +1,8 @@
 import { JobFactory } from "jobs/factory";
 import * as Job from "jobs/job";
 import * as JobConstruct from "jobs/job.construct";
-import * as Utils from "utils";
+import * as pos from "pos";
+import * as utils from "utils";
 
 // ************************* FILL IN HERE ******************************
 export const FACTORY_NAME: string = "construct_extension_factory";
@@ -22,7 +23,7 @@ function get_first_spawn(room: Room): Spawn | null {
 }
 
 function check_pos(x: number, y: number, room: Room): boolean {
-    return Utils.cross_is_clear(x, y, room);
+    return utils.cross_is_clear(x, y, room);
 }
 
 // Factory update function
@@ -31,7 +32,10 @@ function update(this_: Job.Data): void {
         const room = Game.rooms[this_.room];
         const spawn = get_first_spawn(room);
         if (spawn) {
-            return Utils.box_search(spawn.pos, check_pos, 1, 2);
+            const found_pos = utils.box_search(spawn.pos.x, spawn.pos.y, (x, y) => check_pos(x, y, room), 1, 2);
+            if (found_pos) {
+                return pos.room_pos(found_pos, room);
+            }
         }
 
         return null;

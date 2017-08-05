@@ -12,19 +12,23 @@ export const JOB_NAME: string = "harvest_job";
 export { ROLE_NAME };
 
 enum State {
+    ASSIGNED,
     SELECT_SOURCE,
     GO_TO_SOURCE,
     HARVEST,
-    DEPOSIT_ANYWHERE,
-    DEPOSIT_TO_CONTROLLER
+    SELECT_TARGET,
+    BUILD_TARGET,
+    DEPOSIT_TO_TARGET
 }
 
 const state_update = {
+    [State.ASSIGNED]: (_job: Job.Data, creep: Creep, mem: HarvesterMemory) => assigned(creep, () => mem.state = State.SELECT_TARGET, () => mem.state = State.SELECT_SOURCE),
     [State.SELECT_SOURCE]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => search_for_source(job, creep, mem, () => job.active = false, () => mem.state = State.GO_TO_SOURCE),
     [State.GO_TO_SOURCE]: (_job: Job.Data, creep: Creep, mem: HarvesterMemory) => go_to_source(creep, mem, () => mem.state = State.HARVEST),
-    [State.HARVEST]: (_job: Job.Data, creep: Creep, mem: HarvesterMemory) => harvest(creep, mem, () => mem.state = State.DEPOSIT_ANYWHERE, () => mem.state = State.SELECT_SOURCE),
-    [State.DEPOSIT_ANYWHERE]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => deposit_anywhere(creep, mem, () => mem.state = State.DEPOSIT_TO_CONTROLLER, () => job.active = false),
-    [State.DEPOSIT_TO_CONTROLLER]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => deposit_to_controller(creep, () => mem.state = State.DEPOSIT_ANYWHERE, () => job.active = false)
+    [State.HARVEST]: (_job: Job.Data, creep: Creep, mem: HarvesterMemory) => harvest(creep, mem, () => mem.state = State.SELECT_TARGET, () => mem.state = State.SELECT_SOURCE),
+    [State.SELECT_TARGET]: (job: Job.Data, _creep: Creep, mem: HarvesterMemory) => select_target(job, mem, () => mem.state = State.DEPOSIT_TO_TARGET, () => mem.state = State.BUILD_TARGET),
+    [State.BUILD_TARGET]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => build_target(creep, mem, () => job.active = false, () => mem.state = State.SELECT_TARGET),
+    [State.DEPOSIT_TO_TARGET]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => deposit_to_target(creep, mem, () => mem.state = State.SELECT_TARGET, () => job.active = false)
 };
 
 interface HarvesterMemory extends CreepMemory.Data {
@@ -34,7 +38,7 @@ interface HarvesterMemory extends CreepMemory.Data {
 function get_mem(creep: Creep, _reset: boolean = false): HarvesterMemory {
     const mem = CreepMemory.get(creep) as HarvesterMemory;
     if (!mem.state || _reset) {
-        mem.state = State.SELECT_SOURCE;
+        mem.state = State.ASSIGNED;
     }
     return mem;
 }
@@ -57,26 +61,6 @@ export function select_source(job: Job.Data, _harvester: Creep): Source | undefi
             const rnd_idx = Math.floor(Math.random() * 0.999 * sources.length);
             return sources[rnd_idx] as Source;
         }
-    }
-    return undefined;
-}
-
-export function find_deposit_target(room_name: string): RoomObject | undefined {
-    const room = Game.rooms[room_name];
-    if (room.controller) {
-        return room.controller as RoomObject;
-    }
-    const my_spawns = room.find(FIND_MY_SPAWNS);
-    if (my_spawns && my_spawns.length > 0) {
-        return my_spawns[0] as RoomObject;
-    }
-    const my_structures = room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTENSION } });
-    if (my_structures && my_structures.length > 0) {
-        return my_structures[0] as RoomObject;
-    }
-    const sources = room.find(FIND_SOURCES);
-    if (sources && sources.length > 0) {
-        return sources[0] as RoomObject;
     }
     return undefined;
 }
@@ -129,54 +113,103 @@ export function harvest(creep: Creep, mem: CreepMemory.Data,
     }
 }
 
-export function transfer_or_move_to_target(target: Structure, creep: Creep): boolean {
-    switch (creep.transfer(target, RESOURCE_ENERGY)) {
+function select_target(job: Job.Data, mem: CreepMemory.Data, state_change_deposit_to_target: () => void, state_change_build_target: () => void): void {
+    // Target selection:
+    // If controller downgrade in less than x ticks then controller
+    // Otherwise empty extension
+    // Otherwise empty spawn
+    // Otherwise build
+    // Otherwise controller
+    const room = Game.rooms[job.room];
+    const settings = Settings.get().harvester;
+    if (room.controller && room.controller.my && room.controller.ticksToDowngrade < settings.controller_downgrade_ticks) {
+        mem.target = room.controller.id;
+        state_change_deposit_to_target();
+        return;
+    }
+    const extensions = room.find(FIND_MY_STRUCTURES, { filter: (str: Structure) => str.structureType === STRUCTURE_EXTENSION && (str as StructureExtension).energy < (str as StructureExtension).energyCapacity }) as StructureExtension[];
+    if (extensions.length > 0) {
+        mem.target = extensions[0].id;
+        state_change_deposit_to_target();
+        return;
+    }
+    const spawns = room.find(FIND_MY_SPAWNS, { filter: (spawn: Spawn) => spawn.energy < spawn.energyCapacity }) as Spawn[];
+    if (spawns.length > 0) {
+        mem.target = spawns[0].id;
+        state_change_deposit_to_target();
+        return;
+    }
+    const sites = _.sortBy(room.find(FIND_MY_CONSTRUCTION_SITES), (site: ConstructionSite) => site.progressTotal - site.progress) as ConstructionSite[];
+    if (sites.length > 0) {
+        mem.target = sites[0].id;
+        state_change_build_target();
+        return;
+    }
+    if (room.controller && room.controller.my) {
+        mem.target = room.controller.id;
+        state_change_deposit_to_target();
+        return;
+    }
+}
+
+function build_target(creep: Creep, mem: CreepMemory.Data, state_change_done: () => void, state_change_failed: () => void): void {
+    const target = Game.constructionSites[mem.target as string];
+    switch (creep.build(target)) {
         case ERR_NOT_ENOUGH_RESOURCES:
             creep.say("💤");
             // log_progress(job, creep, mem, "Done");
-            return true;
+            state_change_done();
+            break;
         case ERR_NOT_IN_RANGE:
-            creep.moveTo(target, { visualizePathStyle: Settings.get().path_styles.harvester_inbound as any });
+            creep.moveTo(target, { visualizePathStyle: Settings.get().path_styles.builder_inbound as any });
             break;
         case ERR_FULL:
             creep.say("🚫❔ full");
             // log_progress(job, creep, mem, `Target full`);
             break;
+        case ERR_INVALID_TARGET:
+        case ERR_RCL_NOT_ENOUGH:
+            // Site is constructed??
+            if (creep.carry.energy as number > 0) {
+                state_change_failed();
+            } else {
+                state_change_done();
+            }
         default:
     }
-    return false;
 }
 
-export function deposit_anywhere(creep: Creep, mem: CreepMemory.Data,
-                                 state_change_target_not_found: () => void,
-                                 state_change_empty: () => void): void {
-    let target;
-    if (creep.room.name !== mem.home_room) {
-        target = find_deposit_target(mem.home_room);
-        // log_progress(job, creep, mem, "Out of home room, rerouting");
-    } else {
-        target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-            filter: (structure: any) => {
-                return (structure.structureType === STRUCTURE_EXTENSION || structure.structureType === STRUCTURE_SPAWN) &&
-                    structure.energy < structure.energyCapacity;
-            }
-        });
-    }
+export function deposit_to_target(creep: Creep, mem: CreepMemory.Data, state_change_failed: () => void, state_change_done: () => void): void {
+    const target = Game.structures[mem.target as string];
     if (!target) {
-        if (creep.room.controller && creep.room.controller.my) {
-            // log_progress(job, creep, mem, "Couldn't find a spawn or extension, reverting to room controller");
-            state_change_target_not_found();
+        state_change_failed();
+    } else {
+        switch (creep.transfer(target, RESOURCE_ENERGY)) {
+            case ERR_NOT_ENOUGH_RESOURCES:
+                creep.say("💤");
+                state_change_done();
+                // log_progress(job, creep, mem, "Done");
+                break;
+            case ERR_NOT_IN_RANGE:
+                creep.moveTo(target, { visualizePathStyle: Settings.get().path_styles.harvester_inbound as any });
+                break;
+            case ERR_FULL:
+                creep.say("🚫❔ full");
+                state_change_failed();
+                // log_progress(job, creep, mem, `Target full`);
+                break;
+            default:
+                break;
         }
-    } else if (transfer_or_move_to_target(target, creep)) {
-        state_change_empty();
     }
 }
 
-export function deposit_to_controller(creep: Creep, state_change_no_controller: () => void, state_change_empty: () => void): void {
-    if (!creep.room.controller || !creep.room.controller.my) {
-        state_change_no_controller();
-    } else if (transfer_or_move_to_target(creep.room.controller, creep)) {
-        state_change_empty();
+export function assigned(creep: Creep, state_change_full: () => void, state_change_not_full: () => void): void {
+    if (creep.carry.energy === creep.carryCapacity) {
+        state_change_full();
+        creep.say("✅ full");
+    } else {
+        state_change_not_full();
     }
 }
 
@@ -189,10 +222,7 @@ function assign(job: Job.Data): boolean {
         return 0;
     }, (_job: JobCreep.Data, creep: Creep): void => {
         const mem = get_mem(creep, true);
-        if (creep.carry.energy === creep.carryCapacity) {
-            mem.state = State.DEPOSIT_ANYWHERE;
-            creep.say("✅ full");
-        }
+        mem.state = State.ASSIGNED;
     });
 }
 

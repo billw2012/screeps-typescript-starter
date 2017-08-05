@@ -32,19 +32,25 @@ function need_more(room: Room): boolean {
         log("job.spawn.harvester", `room ${room.name} has ${stalled_harvesters} stalled harvesters, aborting spawning`);
         return false;
     }
-    const sources: Source[] = room.find(FIND_SOURCES);
-    const room_energy_cap = sources.reduce((sum: number, source: Source) => sum + source.energyCapacity, 0);
-    const energy_per_tick = room_energy_cap / ENERGY_REGEN_TIME;
-    const room_rate = RoomMemory.get_stats(room).harvest_rate;
-    const desired_rate = energy_per_tick * Settings.get().spawner.harvester_scale;
-    log("job.spawn.harvester", "room " + room.name
-        + ": room_energy_cap = " + room_energy_cap
-        + ", energy_per_tick = " + energy_per_tick
-        + ", room_rate = " + room_rate
-        + ", desired_rate = " + desired_rate
-    );
-    return room_rate < desired_rate;
+    return true;
+    // const sources: Source[] = room.find(FIND_SOURCES);
+    // const room_energy_cap = sources.reduce((sum: number, source: Source) => sum + source.energyCapacity, 0);
+    // const energy_per_tick = room_energy_cap / ENERGY_REGEN_TIME;
+    // const room_rate = RoomMemory.get_stats(room).harvest_rate;
+    // const desired_rate = energy_per_tick * Settings.get().spawner.harvester_scale;
+    // log("job.spawn.harvester", "room " + room.name
+    //     + ": room_energy_cap = " + room_energy_cap
+    //     + ", energy_per_tick = " + energy_per_tick
+    //     + ", room_rate = " + room_rate
+    //     + ", desired_rate = " + desired_rate
+    // );
+    // return room_rate < desired_rate;
 }
+// TODO:
+// Merge harvester and builder
+// Fix spawning energy usage logic - if there are enough creeps then don't spawn until full energy
+// Extension and road placement
+// Switch dontblock to idle operation
 
 function should_harvest_room(room: Room): boolean {
     // TODO: later we will have flags or metadata to specify external rooms for harvesting

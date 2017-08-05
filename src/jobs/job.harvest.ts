@@ -223,7 +223,12 @@ function should_harvest_room(room: Room): boolean {
 
 function get_assigned_harvesters(source: Source) {
     return source.room.find(FIND_MY_CREEPS,
-        { filter: (creep: Creep) => get_mem(creep).target === source.id });
+        {
+            filter: (creep: Creep) => {
+                const mem = get_mem(creep);
+                return mem.role === ROLE_NAME && mem.target === source.id;
+            }
+        });
 }
 
 function create_harvest_jobs(room: Room, jobs: Job.Data[]): void {

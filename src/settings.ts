@@ -93,6 +93,7 @@ export interface SpawnerSettings {
 }
 
 export interface StatsSettings {
+    debug_mode: boolean;
     scan_cpu_cap: number;
     desired_rally_points: number;
     open_space_min: number;
@@ -212,6 +213,7 @@ export function reset() {
             room_distance_cost_multipler: 200,
         },
         stats: {
+            debug_mode: false,
             desired_rally_points: 3,
             open_space_max: 6,
             open_space_min: 1,

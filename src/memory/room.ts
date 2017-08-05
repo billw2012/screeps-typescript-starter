@@ -272,25 +272,31 @@ function get_avoid_set(md: MetaData, room: Room, settings: Settings.StatsSetting
     return set;
 }
 
-function calculate_spawns(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
-    const flags = room.find(FIND_FLAGS, { filter: (obj: Flag) => obj.name.startsWith("Spawn") });
+function remove_flags(room: Room, prefix: string): boolean {
+    const flags = room.find(FIND_FLAGS, { filter: (obj: Flag) => obj.name.startsWith(prefix) });
     if (flags.length > 0) {
         _.forEach(flags, (flag: Flag) => flag.remove());
+        return true;
+    }
+    return false;
+}
+
+function calculate_spawns(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
+    if (remove_flags(room, "Spawn")) {
         return FnResult.SkipTick;
     }
     const existing = _.map(room.find(FIND_MY_SPAWNS), (spawn: Spawn) => ({ x: spawn.pos.x, y: spawn.pos.y })) as pos.Pos[];
     const avoid = get_avoid_set(md, room, settings);
     find_open_spaces(existing, avoid, 3, settings.space_around_spawns, md, room);
     md.spawns = existing;
-    _.forEach(existing, (spawn: pos.Pos, idx: number) => room.createFlag(spawn.x, spawn.y, `Spawn ${idx + 1}`, COLOR_GREEN, COLOR_WHITE));
+    if (settings.debug_mode) {
+        _.forEach(existing, (spawn: pos.Pos, idx: number) => room.createFlag(spawn.x, spawn.y, `Spawn ${idx + 1}`, COLOR_GREEN, COLOR_WHITE));
+    }
     return FnResult.Finished;
 }
 
 function calculate_extensions(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
-    // Remove flags
-    const flags = room.find(FIND_FLAGS, { filter: (obj: Flag) => obj.name.startsWith("Extension") });
-    if (flags.length > 0) {
-        _.forEach(flags, (flag: Flag) => flag.remove());
+    if (remove_flags(room, "Extension")) {
         return FnResult.SkipTick;
     }
     // Find existing extensions
@@ -324,20 +330,13 @@ function calculate_extensions(md: MetaData, settings: Settings.StatsSettings, ro
     }
     add_extensions(room.getPositionAt(md.spawns[spawn_idx].x, md.spawns[spawn_idx].y) as RoomPosition, 60);
     md.extensions = existing;
-    _.forEach(existing, (spawn: pos.Pos, idx: number) => room.createFlag(spawn.x, spawn.y, `Extension ${idx + 1}`, COLOR_YELLOW, COLOR_WHITE));
+    if (settings.debug_mode) {
+        _.forEach(existing, (spawn: pos.Pos, idx: number) => room.createFlag(spawn.x, spawn.y, `Extension ${idx + 1}`, COLOR_YELLOW, COLOR_WHITE));
+    }
     if (existing.length !== 60) {
         log("metadata", `Could not fill extension quota 60 for room ${room.name}, found ${existing.length}`);
     }
     return FnResult.Finished;
-}
-
-function remove_flags(room: Room, prefix: string): boolean {
-    const flags = room.find(FIND_FLAGS, { filter: (obj: Flag) => obj.name.startsWith(prefix) });
-    if (flags.length > 0) {
-        _.forEach(flags, (flag: Flag) => flag.remove());
-        return true;
-    }
-    return false;
 }
 
 function calculate_rally_points(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
@@ -348,11 +347,13 @@ function calculate_rally_points(md: MetaData, settings: Settings.StatsSettings, 
     const avoid = get_avoid_set(md, room, settings);
     find_open_spaces(existing, avoid, 6, settings.space_around_rally_points, md, room);
     md.rally_points = existing;
-    _.forEach(existing, (spawn: pos.Pos, idx: number) => room.createFlag(spawn.x, spawn.y, `Rally ${idx + 1}`, COLOR_BLUE, COLOR_WHITE));
+    if (settings.debug_mode) {
+        _.forEach(existing, (spawn: pos.Pos, idx: number) => room.createFlag(spawn.x, spawn.y, `Rally ${idx + 1}`, COLOR_BLUE, COLOR_WHITE));
+    }
     return FnResult.Finished;
 }
 
-function calculate_exits(md: MetaData, _settings: Settings.StatsSettings, room: Room): FnResult {
+function calculate_exits(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
     // Finding exits:
     // Convert each border into a set of open segments.
     // One exit at the center of each segment.
@@ -397,7 +398,9 @@ function calculate_exits(md: MetaData, _settings: Settings.StatsSettings, room: 
             }
         }
         all_exits.push(edge_exits);
-        _.forEach(edge_exits, (edge_pos: pos.Pos, idx: number) => room.createFlag(edge_pos.x, edge_pos.y, `Exit ${edge_idx}:${idx + 1}`, COLOR_PURPLE, COLOR_WHITE));
+        if (settings.debug_mode) {
+            _.forEach(edge_exits, (edge_pos: pos.Pos, idx: number) => room.createFlag(edge_pos.x, edge_pos.y, `Exit ${edge_idx}:${idx + 1}`, COLOR_PURPLE, COLOR_WHITE));
+        }
     });
 
     md.exits = all_exits;
@@ -411,7 +414,7 @@ function create_cost_matrix(md: MetaData): CostMatrix {
     return cost_matrix;
 }
 
-function calculate_roads(md: MetaData, _settings: Settings.StatsSettings, room: Room): FnResult {
+function calculate_roads(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
     // Roads:
     // Spawn 1 to all sources
     // Controller to all sources
@@ -479,9 +482,11 @@ function calculate_roads(md: MetaData, _settings: Settings.StatsSettings, room: 
         all_roads.push(_.flatten(roads));
     }
 
-    _.forEach(all_roads, (p: pos.Pos[], i: number) => _.forEach(p, (q: pos.Pos, j: number) =>
-        room.createFlag(q.x, q.y, `Road ${i}:${j}`, COLOR_GREY, COLOR_WHITE)
-    ));
+    if (settings.debug_mode) {
+        _.forEach(all_roads, (p: pos.Pos[], i: number) => _.forEach(p, (q: pos.Pos, j: number) =>
+            room.createFlag(q.x, q.y, `Road ${i}:${j}`, COLOR_GREY, COLOR_WHITE)
+        ));
+    }
 
     return FnResult.Finished;
 }

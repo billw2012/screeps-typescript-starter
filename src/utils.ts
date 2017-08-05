@@ -17,17 +17,15 @@ export function same_room_pos(a: RoomPosition, b: RoomPosition): boolean {
 }
 
 export function no_wall_r(x: number, y: number, room_name: string) {
-    if (x < 0 || y < 0 || x >= ROOM_SIZE || y >= ROOM_SIZE) {
-        return false;
-    }
-    return Game.map.getTerrainAt(x, y, room_name) !== "wall";
+    return not_at_edge(x, y) && Game.map.getTerrainAt(x, y, room_name) !== "wall";
+}
+
+export function not_at_edge(x: number, y: number, min_dist: number = 0) {
+    return !(x < min_dist || y < min_dist || x >= ROOM_SIZE - min_dist || y >= ROOM_SIZE - min_dist);
 }
 
 export function no_wall(x: number, y: number, room: Room) {
-    if (x < 0 || y < 0 || x >= ROOM_SIZE || y >= ROOM_SIZE) {
-        return false;
-    }
-    return Game.map.getTerrainAt(x, y, room.name) !== "wall";
+    return not_at_edge(x, y) && Game.map.getTerrainAt(x, y, room.name) !== "wall";
 }
 
 export function box_search(x: number, y: number, pred: (x: number, y: number) => boolean, dist_scale: number = 2, dist_min: number = 2, dist_max: number = 20): pos.Pos | null {

@@ -52,6 +52,7 @@ export interface MetaData {
     spawns: pos.Pos[];
     extensions: pos.Pos[];
     rally_points: pos.Pos[];
+    exits: pos.Pos[][];
     roads: pos.Pos[];
     walls: pos.Pos[];
 }
@@ -59,6 +60,7 @@ export interface MetaData {
 export function construct_metadata(): MetaData {
     return {
         distance_field: [],
+        exits: [],
         extensions: [],
         flags: MetadataFlags.None,
         keep_clear: [],
@@ -286,7 +288,7 @@ function calculate_extensions(md: MetaData, settings: Settings.StatsSettings, ro
     // Function to add extensions until total reaches "count".
     function add_extensions(p: RoomPosition, count: number) {
         // Box search outwards from "pos", and add an extension if it is on the odd squares (e.g. black on a chess board) the NSEW cross is clear and it avoids the avoid set.
-        flood.search(p.x, p.y, (x, y) => utils.no_wall(x, y, room), (x, y) => {
+        flood.search(p.x, p.y, (x, y) => utils.no_wall(x, y, room) && utils.not_at_edge(x, y, settings.room_border), (x, y) => {
             if ((x + y) % 2 === 1
                 && utils.cross_is_clear(x, y, room)
                 && does_avoid_set({ x, y }, 0, avoid)

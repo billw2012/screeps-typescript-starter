@@ -101,6 +101,7 @@ export interface StatsSettings {
     space_around_rally_points: number;
     space_around_controllers: number;
     space_around_sources: number;
+    room_border: number;
 }
 
 export interface ConstructionSettings {
@@ -119,7 +120,7 @@ export interface Settings {
     construct: ConstructionSettings;
 }
 
-const CURRENT_VERSION = 25;
+const CURRENT_VERSION = 26;
 export function reset() {
     Memory.settings = {
         version: CURRENT_VERSION,
@@ -214,6 +215,7 @@ export function reset() {
             desired_rally_points: 3,
             open_space_max: 6,
             open_space_min: 1,
+            room_border: 6,
             scan_cpu_cap: 0.2,
             space_around_controllers: 4,
             space_around_rally_points: 3,

@@ -4,7 +4,7 @@ import * as pos from "pos";
 import * as flood from "search.flood";
 import * as utils from "utils";
 
-const METADATA_VERSION = 7;
+const METADATA_VERSION = 8;
 
 export enum MetadataFlags {
     None = 0,
@@ -13,10 +13,11 @@ export enum MetadataFlags {
     Spawns = 1 << 2,
     Extensions = 1 << 3,
     RallyPoints = 1 << 4,
-    Roads = 1 << 5,
-    Walls = 1 << 6,
-    KeepClear = 1 << 7,
-    All = SourceSpaceCount | OpenSpaces | RallyPoints | Spawns | Extensions | Roads | Walls | KeepClear
+    Exits = 1 << 5,
+    Roads = 1 << 6,
+    Walls = 1 << 7,
+    KeepClear = 1 << 8,
+    All = (1 << 9) - 1
 }
 const MetadataFlagsBits = 9;
 
@@ -32,6 +33,7 @@ const METADATA_FUNCTIONS = {
     [MetadataFlags.Spawns]: calculate_spawns,
     [MetadataFlags.Extensions]: calculate_extensions,
     [MetadataFlags.RallyPoints]: calculate_rally_points,
+    [MetadataFlags.Exits]: calculate_exits,
     [MetadataFlags.Roads]: calculate_roads,
     [MetadataFlags.Walls]: calculate_walls,
     [MetadataFlags.KeepClear]: calculate_keep_clear,
@@ -39,6 +41,13 @@ const METADATA_FUNCTIONS = {
 
 export interface SourceSpaces {
     [key: string]: number;
+}
+
+export enum Edges {
+    TOP,
+    BOTTOM,
+    LEFT,
+    RIGHT
 }
 
 export interface MetaData {
@@ -52,8 +61,11 @@ export interface MetaData {
     spawns: pos.Pos[];
     extensions: pos.Pos[];
     rally_points: pos.Pos[];
+    // exit points on each edge, top bottom left right
     exits: pos.Pos[][];
-    roads: pos.Pos[];
+    // all positions for all roads for each controller level in room
+    // Index is [level][pos]
+    roads: pos.Pos[][];
     walls: pos.Pos[];
 }
 
@@ -114,17 +126,17 @@ export function update_metadata(room: Room) {
         return;
     }
 
-    const stats_settings = Settings.get().stats;
+    const settings = Settings.get().stats;
     const start_cpu = Game.cpu.getUsed();
     const allowed_cpu = Game.cpu.limit - start_cpu;
 
-    while (md.flags !== MetadataFlags.All && (Game.cpu.getUsed() - start_cpu) / allowed_cpu < stats_settings.scan_cpu_cap) {
+    while (md.flags !== MetadataFlags.All && (Game.cpu.getUsed() - start_cpu) / allowed_cpu < settings.scan_cpu_cap) {
         for (let idx = 0; idx < MetadataFlagsBits; ++idx) {
             const flag = 1 << idx;
             if ((md.flags & flag) === 0) {
                 // log("metadata", `Room ${room.name} calculating ${MetadataFlags[flag]} (${flag})`);
                 const func: any = METADATA_FUNCTIONS[flag];
-                switch (func(md, stats_settings, room)) {
+                switch (func(md, settings, room)) {
                     case FnResult.Finished:
                         md.flags |= flag;
                         log("metadata", `Room ${room.name} done calculating ${MetadataFlags[flag]}`);
@@ -145,7 +157,7 @@ export function update_metadata(room: Room) {
 //     return true;
 // }
 
-function calc_source_spaces(md: MetaData, _stats_settings: Settings.StatsSettings, room: Room): FnResult {
+function calc_source_spaces(md: MetaData, _settings: Settings.StatsSettings, room: Room): FnResult {
     const source_spaces: SourceSpaces = {};
     room.find(FIND_SOURCES).forEach((s: Source) => {
         const terrain = (room.lookForAtArea(LOOK_TERRAIN, s.pos.y - 1, s.pos.x - 1,
@@ -157,10 +169,10 @@ function calc_source_spaces(md: MetaData, _stats_settings: Settings.StatsSetting
     return FnResult.Finished;
 }
 
-function scan_for_space(md: MetaData, stats_settings: Settings.StatsSettings, room: Room): FnResult {
+function scan_for_space(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
     // Update room "distance fields". i.e. locations of points that have a box of >= x*2+1 size of free space around them
     // Fill up the empty spaces
-    while (md.open_spaces.length <= stats_settings.open_space_min) {
+    while (md.open_spaces.length <= settings.open_space_min) {
         md.open_spaces.push([]);
     }
     // If there is a space of the current size at the current point then add it to the list
@@ -195,7 +207,7 @@ function scan_for_space(md: MetaData, stats_settings: Settings.StatsSettings, ro
         md.scan.y = size;
         md.scan.x = size;
     }
-    if (md.open_spaces.length > stats_settings.open_space_max) {
+    if (md.open_spaces.length > settings.open_space_max) {
         return FnResult.Finished;
     }
     return FnResult.NotFinished;
@@ -319,10 +331,17 @@ function calculate_extensions(md: MetaData, settings: Settings.StatsSettings, ro
     return FnResult.Finished;
 }
 
-function calculate_rally_points(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
-    const flags = room.find(FIND_FLAGS, { filter: (obj: Flag) => obj.name.startsWith("Rally") });
+function remove_flags(room: Room, prefix: string): boolean {
+    const flags = room.find(FIND_FLAGS, { filter: (obj: Flag) => obj.name.startsWith(prefix) });
     if (flags.length > 0) {
         _.forEach(flags, (flag: Flag) => flag.remove());
+        return true;
+    }
+    return false;
+}
+
+function calculate_rally_points(md: MetaData, settings: Settings.StatsSettings, room: Room): FnResult {
+    if (remove_flags(room, "Rally")) {
         return FnResult.SkipTick;
     }
     const existing: pos.Pos[] = []; // _.map(room.find(FIND_MY_SPAWNS), (spawn: Spawn) => ({ x: spawn.pos.x, y: spawn.pos.y })) as pos.Pos[];
@@ -333,15 +352,147 @@ function calculate_rally_points(md: MetaData, settings: Settings.StatsSettings, 
     return FnResult.Finished;
 }
 
-function calculate_roads(_md: MetaData, _stats_settings: Settings.StatsSettings, _room: Room): FnResult {
+function calculate_exits(md: MetaData, _settings: Settings.StatsSettings, room: Room): FnResult {
+    // Finding exits:
+    // Convert each border into a set of open segments.
+    // One exit at the center of each segment.
+    // ORDER: TOP, BOTTOM, LEFT, RIGHT
+    if (remove_flags(room, "Exit")) {
+        return FnResult.SkipTick;
+    }
+
+    const edges: any[] = [
+        { // TOP
+            dir: pos.make_pos(1, 0),
+            start: pos.make_pos(0, 0),
+        },
+        { // BOTTOM
+            dir: pos.make_pos(1, 0),
+            start: pos.make_pos(0, utils.ROOM_SIZE - 1),
+        },
+        { // LEFT
+            dir: pos.make_pos(0, 1),
+            start: pos.make_pos(0, 0),
+        },
+        { // RIGHT
+            dir: pos.make_pos(0, 1),
+            start: pos.make_pos(utils.ROOM_SIZE - 1, 0),
+        },
+    ];
+    const all_exits: pos.Pos[][] = [];
+    _.forEach(edges, (edge, edge_idx) => {
+        const edge_exits: pos.Pos[] = [];
+        let in_gap = utils.no_wall(edge.start.x, edge.start.y, room);
+        let p = edge.start;
+        let curr_gap_start = edge.start;
+        for (let n = 0; n < utils.ROOM_SIZE; ++n, p = pos.add(p, edge.dir)) {
+            const wall = !utils.no_wall(p.x, p.y, room);
+            if (wall && in_gap) {
+                const center = pos.mul(pos.add(curr_gap_start, p), 0.5);
+                edge_exits.push(center);
+                in_gap = false;
+            } else if (!wall && !in_gap) {
+                curr_gap_start = p;
+                in_gap = true;
+            }
+        }
+        all_exits.push(edge_exits);
+        _.forEach(edge_exits, (edge_pos: pos.Pos, idx: number) => room.createFlag(edge_pos.x, edge_pos.y, `Exit ${edge_idx}:${idx + 1}`, COLOR_PURPLE, COLOR_WHITE));
+    });
+
+    md.exits = all_exits;
     return FnResult.Finished;
 }
 
-function calculate_walls(_md: MetaData, _stats_settings: Settings.StatsSettings, _room: Room): FnResult {
+function create_cost_matrix(md: MetaData): CostMatrix {
+    const cost_matrix = new PathFinder.CostMatrix();
+    _.forEach(md.spawns, (p: pos.Pos) => cost_matrix.set(p.x, p.y, 0xff));
+    _.forEach(md.extensions, (p: pos.Pos) => cost_matrix.set(p.x, p.y, 0xff));
+    return cost_matrix;
+}
+
+function calculate_roads(md: MetaData, _settings: Settings.StatsSettings, room: Room): FnResult {
+    // Roads:
+    // Spawn 1 to all sources
+    // Controller to all sources
+    // All around expansions
+    // Spawn 2 to all sources
+    // Spawn 3 to all sources
+    // Exits to spawns
+    if (remove_flags(room, "Road")) {
+        return FnResult.SkipTick;
+    }
+
+    const cost_matrix = create_cost_matrix(md);
+    const sources: RoomPosition[] = _.map(room.find<Source>(FIND_SOURCES), (s: Source) => s.pos);
+    const spawns = _.map(md.spawns, (p: pos.Pos) => room.getPositionAt(p.x, p.y) as RoomPosition);
+    // top bottom left right
+    const cross_points: pos.Pos[] = [
+        { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }
+    ];
+
+    const exits =
+        // map pos.Pos to RoomPosition
+        _.map(
+            // flatten out the multiple exits to a flat list of pos
+            _.flatten(
+                // apply the offsets to the exits so they are within the map bounds and getPositionAt will be valid
+                _.zipWith(md.exits, cross_points, (side: pos.Pos[], cross_point: pos.Pos): pos.Pos[] =>
+                    _.map(side, (p: pos.Pos): pos.Pos => pos.add(p, cross_point))
+                ) as pos.Pos[][]
+            ), (p: pos.Pos): RoomPosition => room.getPositionAt(p.x, p.y) as RoomPosition
+        );
+
+    // const extensions = _.map(md.extensions, (p: pos.Pos) => room.getPositionAt(p.x, p.y) as RoomPosition);
+
+    const get_path = (from: RoomPosition, to: RoomPosition, range: number) =>
+        _.map(PathFinder.search(from, { pos: to, range }, pf_opts).path, (r: RoomPosition) => pos.make_pos(r.x, r.y));
+    // const get_path_n_to_1 = (from: RoomPosition[], to: RoomPosition, range: number) =>
+    //            _.map(from, (q: RoomPosition) => get_path(q, to, range));
+    const get_path_1_to_n = (from: RoomPosition, to: RoomPosition[], range: number) =>
+        _.flatten(_.map(to, (q: RoomPosition) => get_path(from, q, range)));
+    const pf_opts = { roomCallback: () => cost_matrix };
+
+    // all_roads[0] = get_path_1_to_n(spawns[0], sources, 1);
+    const all_roads: pos.Pos[][] = [];
+    all_roads.push([]);
+
+    for (let level = 1; level < 9; ++level) {
+        const roads = [];
+        if (level === 1) {
+            if (room.controller) {
+                const ctrl = room.controller.pos;
+                roads.push(get_path_1_to_n(ctrl, sources, 1));
+                roads.push(get_path_1_to_n(ctrl, exits, 1));
+            }
+        }
+        // roads from spawn to sources
+        const spawn_count = CONTROLLER_STRUCTURES[STRUCTURE_SPAWN][level];
+        if (spawns.length >= spawn_count && spawn_count > CONTROLLER_STRUCTURES[STRUCTURE_SPAWN][level - 1]) {
+            roads.push(get_path_1_to_n(spawns[spawn_count - 1], sources, 1));
+            roads.push(get_path_1_to_n(spawns[spawn_count - 1], exits, 1));
+        }
+        // roads around available extensions
+        for (let ext = CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][level - 1]; ext < CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][level]; ++ext) {
+            roads.push(_.map(cross_points, (offs: pos.Pos) => pos.add(offs, md.extensions[ext])));
+        }
+        all_roads.push(_.flatten(roads));
+    }
+
+    _.forEach(all_roads, (p: pos.Pos[], i: number) => _.forEach(p, (q: pos.Pos, j: number) =>
+        room.createFlag(q.x, q.y, `Road ${i}:${j}`, COLOR_GREY, COLOR_WHITE)
+    ));
+
     return FnResult.Finished;
 }
 
-function calculate_keep_clear(_md: MetaData, _stats_settings: Settings.StatsSettings, _room: Room): FnResult {
+function calculate_walls(_md: MetaData, _settings: Settings.StatsSettings, _room: Room): FnResult {
+    // All around edges skipping roads
+    return FnResult.Finished;
+}
+
+function calculate_keep_clear(_md: MetaData, _settings: Settings.StatsSettings, _room: Room): FnResult {
+    // All roads, spaces around all constructions. Use avoid set
     return FnResult.Finished;
 }
 
@@ -375,14 +526,14 @@ export function get_stats(room: Room): Stats {
 //     // stats.harvest_rate = _.reduce(havesters, (sum: number, c: Creep) => sum + CreepMemory.get(c).harvest_rate, 0);
 //     // log("stats", `room ${room.name} stats = ${JSON.stringify(stats)}`);
 
-//     const stats_settings = Settings.get().stats;
+//     const settings = Settings.get().stats;
 //     const start_cpu = Game.cpu.getUsed();
 //     const allowed_cpu = Game.cpu.tickLimit - start_cpu;
 
 //     // Update room "distance fields". i.e. locations of points that have a box of >= x*2+1 size of free space around them
-//     while (stats.open_spaces.length <= stats_settings.open_space_max && (Game.cpu.getUsed() - start_cpu) / allowed_cpu < stats_settings.scan_cpu_cap) {
+//     while (stats.open_spaces.length <= settings.open_space_max && (Game.cpu.getUsed() - start_cpu) / allowed_cpu < settings.scan_cpu_cap) {
 //         // Fill up the empty spaces
-//         while (stats.open_spaces.length <= stats_settings.open_space_min) {
+//         while (stats.open_spaces.length <= settings.open_space_min) {
 //             stats.open_spaces.push([]);
 //         }
 //         // If there is a space of the current size at the current point then add it to the list

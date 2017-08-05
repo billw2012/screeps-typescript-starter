@@ -17,6 +17,10 @@ export function sub(a: Pos, b: Pos): Pos {
     return make_pos(a.x - b.x, a.y - b.y);
 }
 
+export function mul(a: Pos, b: number): Pos {
+    return make_pos(a.x * b, a.y * b);
+}
+
 export function get_pos(p: RoomPosition): Pos {
     return {x: p.x, y: p.y};
 }

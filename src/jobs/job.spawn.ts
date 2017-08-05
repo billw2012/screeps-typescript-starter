@@ -90,7 +90,7 @@ export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = 
 
     let best: { rating: number, spawn?: Spawn } = { rating: 0, spawn: undefined };
     _.forOwn(Game.spawns, (spawn: Spawn) => {
-        if (spawn.my && !spawn.spawning) {
+        if (spawn.my && !spawn.spawning && spawn.memory.last_spawned !== Game.time) {
             const rating = rate(this_, spawn);
             // Rating of -1 means immediately choose this creep and abort further search
             if (rating === -1) {
@@ -107,6 +107,7 @@ export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = 
         const body = BodySpec.generate(this_.body_spec, best_spawn.room.energyAvailable);
         // Its possible to fail to make the body
         if (body) {
+            log("job.spawn", `Assigned spawning job for ${this_.role}`);
             const this_pos = Job.get_pos(this_) as RoomPosition;
             const result = best_spawn.createCreep(body, this_.creep_name, {
                 data: CreepMemory.construct(this_pos ? this_pos.roomName : best_spawn.room.name, this_.id, this_.role)
@@ -114,11 +115,14 @@ export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = 
             if (result as string) {
                 this_.assigned_spawner = best_spawn.name;
                 this_.creep_name = result as string;
+                best_spawn.memory.last_spawned = Game.time;
                 // Set job as active
                 this_.active = true;
                 return true;
             }
         }
+    } else {
+        log("job.spawn", `Failed assigned spawning job for ${this_.role}`, Settings.LogLevel.WARNING);
     }
     return false;
 }

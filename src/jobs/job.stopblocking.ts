@@ -3,6 +3,7 @@ import * as Job from "jobs/job";
 import * as JobCreep from "jobs/job.creep";
 import { log, Settings } from "log";
 import * as CreepMemory from "memory/creep";
+import * as RoomMemory from "memory/room";
 import * as Utils from "utils";
 
 export const FACTORY_NAME: string = "stopblocking_factory";
@@ -21,11 +22,6 @@ function get_mem(creep: Creep, reset: boolean = false): StopBlockingMemory {
     }
     return mem;
 }
-
-// function get_blocked_things(creep: Creep): LookAtResultWithPos[] {
-//     return creep.room.lookForAtArea(LOOK_STRUCTURES, creep.pos.y - 1, creep.pos.x - 1,
-//         creep.pos.y + 1, creep.pos.x + 1, true) as LookAtResultWithPos[];
-// }
 
 function get_blocking_creeps(pos: RoomPosition): Creep[] {
     const room = Game.rooms[pos.roomName] as Room;
@@ -57,55 +53,20 @@ function log_progress(job: JobCreep.Data, creep: Creep, mem: StopBlockingMemory,
     log("job.stopblocking", `[${creep.name}|${job.id}|${mem.state}]: ${msg}`);
 }
 
-// function is_unblocked(x: number, y: number, roomName: string) {
-//     if (x < 0 || y < 0 || x >= ROOM_SIZE || y >= ROOM_SIZE) {
-//         return false;
-//     }
-//     return Game.map.getTerrainAt(x, y, roomName) !== "wall";
-// }
-
-// function get_free_space(from: RoomPosition): RoomPosition | null {
-//     const dist_scale = 2;
-//     const room = Game.rooms[from.roomName];
-//     // Boxsearch
-//     for (let dist = 2; dist < 20; ++dist) {
-//         const dists = dist * dist_scale;
-//         for (let i = -dist; i < dist; ++i) {
-//             const ii = i * dist_scale;
-//             const iix = ii + from.x;
-//             const iiy = ii + from.y;
-//             // Top side
-//             if (is_unblocked(iix, -dists + from.y, from.roomName)) {
-//                 return room.getPositionAt(iix, -dists + from.y);
-//             }
-//             // Bottom side
-//             if (is_unblocked(iix, dists + from.y, from.roomName)) {
-//                 return room.getPositionAt(iix, dists + from.y);
-//             }
-//             // Left side
-//             if (is_unblocked(dists + from.x, iiy, from.roomName)) {
-//                 return room.getPositionAt(dists + from.x, iiy);
-//             }
-//             // Right side
-//             if (is_unblocked(-dists + from.x, iiy, from.roomName)) {
-//                 return room.getPositionAt(-dists + from.x, iiy);
-//             }
-//         }
-//     }
-//     return null;
-// }
-
 function update_internal(job: JobCreep.Data, creep: Creep): void {
     const mem = get_mem(creep);
     switch (mem.state) {
         case State.UNKNOWN: {
-            const free_space = Utils.box_search(Job.get_pos(job) as RoomPosition, Utils.no_wall) as RoomPosition;
-            if (!free_space) {
-                log("job.stopblocking", "Couldn't find free space to move to!", Settings.LogLevel.WARNING);
+            const room = Game.rooms[job.room];
+            const rally_points = RoomMemory.get_rally_points(room);
+            // const free_space = Utils.box_search(Job.get_pos(job) as RoomPosition, Utils.no_wall) as RoomPosition;
+            if (rally_points.length === 0) {
+                log("job.stopblocking", "Couldn't find rally point to move to!", Settings.LogLevel.WARNING);
                 creep.say("🔺no space");
             } else {
-                mem.target_x = free_space.x;
-                mem.target_y = free_space.y;
+                const rnd_ptr = Math.round(Math.random() * (rally_points.length - 1));
+                mem.target_x = rally_points[rnd_ptr].x;
+                mem.target_y = rally_points[rnd_ptr].y;
                 mem.state = State.MOVING;
                 log_progress(job, creep, mem, "Found target");
                 creep.say("⌦");
@@ -139,9 +100,6 @@ function update_internal(job: JobCreep.Data, creep: Creep): void {
 }
 
 function clean_up(creep: Creep): void {
-    // ************************* FILL IN HERE ******************************
-    // Cleanup after job, this is called when job.active becomes false,
-    // e.g. if set manually in update_internal, or in kill
     const mem = get_mem(creep);
     delete mem.state;
     delete mem.target_x;
@@ -160,24 +118,6 @@ function kill(job: Job.Data): boolean {
 
 // Factory generate new jobs function
 function generate_new_jobs(_active_jobs: Job.Data[]): Job.Data[] {
-    // ************************* FILL IN HERE ******************************
-    // Optionally clean up broken job-creep links
-    // if (Game.time % 10) {
-    //     _.forOwn(Game.creeps, (creep: Creep) => {
-    //         const mem = get_mem(creep);
-    //         // IF it is one of our creeps and has a job assigned
-    //         if (mem.role === xxxx && mem.job !== undefined) {
-    //             // If we can't find the assigned job
-    //             if (!_.find(_active_jobs, (job: Job.Data) =>
-    //                     job.type === JOB_NAME && (job as JobCreep.Data).assigned_creep === creep.name)) {
-    //                 log("job.harvest", `Cleaning disconnected job ${mem.job} for creep ${creep.name}`);
-    //                 mem.job = undefined;
-    //                 clean_up(creep);
-    //             }
-    //         }
-    //     });
-    // }
-    // ************************* FILL IN HERE ******************************
     // Generate jobs
     const new_jobs: Job.Data[] = [];
     const unblock = (objs: RoomObject[]) => {
@@ -193,8 +133,6 @@ function generate_new_jobs(_active_jobs: Job.Data[]): Job.Data[] {
         unblock(room.find(FIND_MY_SPAWNS));
         // unblock sources
         unblock(room.find(FIND_SOURCES));
-        // const things = get_blocked_things(creep);
-        // return things.length > 0 ? 1 : 0;
     });
     return new_jobs;
 }

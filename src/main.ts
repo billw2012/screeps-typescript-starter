@@ -1,9 +1,12 @@
+import * as JobBuild from "jobs/job.build";
 import * as JobConstructExtension from "jobs/job.construct.extension";
 import * as JobHarvest from "jobs/job.harvest";
+import * as JobSpawnBuilder from "jobs/job.spawn.builder";
 import * as JobSpawnHarvester from "jobs/job.spawn.harvester";
 import * as JobStopBlocking from "jobs/job.stopblocking";
 import * as JobManager from "jobs/manager";
 import { log, Settings } from "log";
+import * as RoomMemory from "memory/room";
 import * as Profiler from "screeps-profiler";
 
 // Any code written outside the `loop()` method is executed only when the
@@ -30,10 +33,14 @@ function mloop() {
 
     JobManager.update({
         [JobSpawnHarvester.FACTORY_NAME]: JobSpawnHarvester.get_factory(),
+        [JobBuild.FACTORY_NAME]: JobBuild.get_factory(),
         [JobHarvest.FACTORY_NAME]: JobHarvest.get_factory(),
         [JobStopBlocking.FACTORY_NAME]: JobStopBlocking.get_factory(),
         [JobConstructExtension.FACTORY_NAME]: JobConstructExtension.get_factory(),
+        [JobSpawnBuilder.FACTORY_NAME]: JobSpawnBuilder.get_factory(),
     });
+
+    RoomMemory.update_all_room_metadata();
 }
 
 /**

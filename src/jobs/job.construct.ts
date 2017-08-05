@@ -32,6 +32,10 @@ export function get_controller_structures(room: Room, structure: string): Struct
     return room.find(FIND_MY_STRUCTURES, { filter: { structureType: structure } });
 }
 
+export function get_under_construction(room: Room, structure: string): ConstructionSite[] {
+    return room.find(FIND_MY_CONSTRUCTION_SITES, { filter: { structureType: structure } });
+}
+
 // Factory assign function
 export function assign(_job: Data): boolean {
     return true;

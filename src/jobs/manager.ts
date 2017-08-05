@@ -118,6 +118,14 @@ function get_priority(job: Job.Data): number {
     }
 }
 
+function get_interval(factory_settings: Settings.FactorySettings, factory_name: string): number {
+    if (!factory_settings[factory_name]) {
+        return factory_settings.default.interval;
+    } else {
+        return factory_settings[factory_name].interval;
+    }
+}
+
 interface Factories {
     [key: string]: JobFactory;
 }
@@ -153,7 +161,7 @@ export function update(factories: Factories) {
     const factory_settings = Settings.get().factories;
     // Generate new jobs
     _.forOwn(factories, (factory: JobFactory, factory_name: string) => {
-        if (Game.time % factory_settings[factory_name].interval === 0) {
+        if (Game.time % get_interval(factory_settings, factory_name) === 0) {
             const active_jobs = _.filter(jobs, (job: Job.Data) => job.factory === factory_name);
             const new_jobs = factory.generate_new_jobs(active_jobs);
             if (new_jobs.length > 0) {

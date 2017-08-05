@@ -33,6 +33,7 @@ function update(this_: Job.Data): void {
         if (spawn) {
             return Utils.box_search(spawn.pos, check_pos, 1, 2);
         }
+
         return null;
     });
 }
@@ -45,7 +46,8 @@ function generate_new_jobs(_active_jobs: Job.Data[]): Job.Data[] {
     _.forOwn(Game.rooms, (room: Room) => {
         const max = JobConstruct.get_controller_structure_max(room, STRUCTURE_NAME);
         const curr = JobConstruct.get_controller_structures(room, STRUCTURE_NAME);
-        if (curr.length < max) {
+        const under_construction = JobConstruct.get_under_construction(room, STRUCTURE_NAME);
+        if (curr.length + under_construction.length < max) {
             new_jobs.push(JobConstruct.construct_auto_pos(JOB_NAME, FACTORY_NAME, room.name, STRUCTURE_NAME));
         }
         // const jobs_in_room = _.sum(active_jobs, (job: Job.Data) => (job.room === room.name) ? 1 : 0);

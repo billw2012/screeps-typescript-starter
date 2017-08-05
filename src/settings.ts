@@ -16,7 +16,7 @@ export enum LogLevel {
     ERROR
 }
 
-interface PathStyle {
+export interface PathStyle {
     fill: string;
     lineStyle: string;
     opacity: number;
@@ -24,37 +24,38 @@ interface PathStyle {
     strokeWidth: number;
 }
 
-interface LogSettings {
+export interface LogSettings {
     enabled: string[];
     min_level: LogLevel;
 }
 
-interface DebugSettings {
+export interface DebugSettings {
     log: LogSettings;
 }
 
-interface HarvesterSettings {
+export interface HarvesterSettings {
     rate_measure_period: number;
 }
 
-interface JobSetting {
+export interface JobSetting {
     priority: number;
     ttl: number;
 }
 
-interface JobsSettings {
+export interface JobsSettings {
     [key: string]: JobSetting;
     default: JobSetting;
-    harvest_spawn: JobSetting;
-    harvest: JobSetting;
-    stopblocking: JobSetting;
+    spawn_builder_job: JobSetting;
+    spawn_harvester_job: JobSetting;
+    harvest_job: JobSetting;
+    stopblocking_job: JobSetting;
 }
 
-interface FactorySetting {
+export interface FactorySetting {
     interval: number;
 }
 
-interface FactorySettings {
+export interface FactorySettings {
     [key: string]: FactorySetting;
     default: FactorySetting;
     harvest_factory: FactorySetting;
@@ -64,22 +65,24 @@ interface FactorySettings {
     construct_extension_factory: FactorySetting;
 }
 
-interface PathStyles {
+export interface PathStyles {
     // [key: string]: PathStyle;
+    builder_inbound: PathStyle;
     harvester_inbound: PathStyle;
     harvester_outbound: PathStyle;
     spawned: PathStyle;
     stopblocking: PathStyle;
 }
 
-interface ProfileSettings {
+export interface ProfileSettings {
     enabled: boolean;
 }
 
-interface SpawnLimits {
+export interface SpawnLimits {
     [key: string]: number;
 }
-interface SpawnerSettings {
+
+export interface SpawnerSettings {
     distance_cost_multiplier: number;
     harvester_scale: number;
     move_to_position_range: number;
@@ -88,7 +91,18 @@ interface SpawnerSettings {
     per_room_limits: SpawnLimits;
 }
 
-interface Settings {
+export interface StatsSettings {
+    scan_cpu_cap: number;
+    desired_rally_points: number;
+    open_space_min: number;
+    open_space_max: number;
+}
+
+export interface ConstructionSettings {
+    extension_spacing: number;
+}
+
+export interface Settings {
     debug: DebugSettings;
     harvester: HarvesterSettings;
     jobs: JobsSettings;
@@ -96,9 +110,11 @@ interface Settings {
     path_styles: PathStyles;
     profile: ProfileSettings;
     spawner: SpawnerSettings;
+    stats: StatsSettings;
+    construct: ConstructionSettings;
 }
 
-const CURRENT_VERSION = 15;
+const CURRENT_VERSION = 21;
 export function reset() {
     Memory.settings = {
         version: CURRENT_VERSION,
@@ -111,9 +127,11 @@ export function reset() {
                     "job.spawn.harvester",
                     "job.harvest",
                     "job.creep",
+                    "job.spawn",
                     "job.construct",
                     "creep",
-                    "manager"
+                    "manager",
+                    "metadata"
                 ],
                 min_level: LogLevel.INFO
             }
@@ -123,9 +141,10 @@ export function reset() {
         },
         jobs: {
             default: { priority: 1, ttl: 200 },
-            harvest: { priority: 1, ttl: 200 },
-            harvest_spawn: { priority: 1, ttl: 200 },
-            stopblocking: { priority: 2, ttl: 50 },
+            harvest_job: { priority: 1, ttl: 200 },
+            spawn_builder_job: { priority: 2, ttl: 200 },
+            spawn_harvester_job: { priority: 1, ttl: 200 },
+            stopblocking_job: { priority: 2, ttl: 50 },
         },
         factories: {
             construct_extension_factory:  { interval: 1 },
@@ -136,18 +155,25 @@ export function reset() {
             stopblocking_factory:  { interval: 1 }
         },
         path_styles: {
+            builder_inbound: {
+                fill: "transparent",
+                lineStyle: "dashed",
+                opacity: .1,
+                stroke: "#ffa33a",
+                strokeWidth: .05
+            },
             harvester_inbound: {
                 fill: "transparent",
                 lineStyle: "dashed",
                 opacity: .1,
-                stroke: "#00ffff",
+                stroke: "#5e59ff",
                 strokeWidth: .05
             },
             harvester_outbound: {
                 fill: "transparent",
                 lineStyle: "dashed",
                 opacity: .1,
-                stroke: "#00ff00",
+                stroke: "#59ff6f",
                 strokeWidth: .05
             },
             spawned: {
@@ -161,7 +187,7 @@ export function reset() {
                 fill: "transparent",
                 lineStyle: "solid",
                 opacity: .5,
-                stroke: "#ff5050",
+                stroke: "#ffeb5b",
                 strokeWidth: .15
             }
         },
@@ -177,6 +203,15 @@ export function reset() {
                 harvester: 20,
             },
             room_distance_cost_multipler: 200,
+        },
+        stats: {
+            desired_rally_points: 3,
+            open_space_max: 6,
+            open_space_min: 1,
+            scan_cpu_cap: 0.2,
+        },
+        construct: {
+            extension_spacing: 1
         }
     };
 }

@@ -1,4 +1,5 @@
 import * as JobConstructExtension from "jobs/job.construct.extension";
+import * as JobConstructRoad from "jobs/job.construct.road";
 import * as JobHarvest from "jobs/job.harvest";
 import * as JobSpawnHarvester from "jobs/job.spawn.harvester";
 import * as JobStopBlocking from "jobs/job.stopblocking";
@@ -34,6 +35,7 @@ function mloop() {
         [JobHarvest.FACTORY_NAME]: JobHarvest.get_factory(),
         [JobStopBlocking.FACTORY_NAME]: JobStopBlocking.get_factory(),
         [JobConstructExtension.FACTORY_NAME]: JobConstructExtension.get_factory(),
+        [JobConstructRoad.FACTORY_NAME]: JobConstructRoad.get_factory(),
     });
 
     RoomMemory.update_all_room_metadata();

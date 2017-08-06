@@ -487,6 +487,7 @@ function calculate_roads(md: MetaData, settings: Settings.StatsSettings, room: R
             room.createFlag(q.x, q.y, `Road ${i}:${j}`, COLOR_GREY, COLOR_WHITE)
         ));
     }
+    md.roads = all_roads;
 
     return FnResult.Finished;
 }

@@ -19,6 +19,13 @@ export function construct_from_pos(type: string, factory: string, pos: RoomPosit
     return base;
 }
 
+export function get_active_creeps(role: string): Creep[] {
+    return _.filter(Game.creeps, (creep: Creep) => {
+        const mem = CreepMemory.get(creep);
+        return mem.role === role && mem.job;
+    });
+}
+
 export function assign(this_: Data, rate: (job: Data, creep: Creep) => number, assigned: (job: Data, creep: Creep) => void): boolean {
     let best: { rating: number, creep?: Creep } = { rating: -1, creep: undefined };
     // Find the best creep by rating.

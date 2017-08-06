@@ -58,8 +58,21 @@ function should_harvest_room(room: Room): boolean {
 }
 
 // Factory assign function
-function assign(job: Job.Data): boolean {
-    return SpawnJob.assign(job as SpawnJob.Data);
+function assign(job_: Job.Data): boolean {
+    return SpawnJob.assign(job_ as SpawnJob.Data, (job: SpawnJob.Data, spawn: StructureSpawn) => {
+        const room = Game.rooms[job.room];
+        const creeps_for_room = room.find(FIND_MY_CREEPS, {
+            filter: (c: Creep) => {
+                const mem = CreepMemory.get(c);
+                return mem.role === ROLE_NAME && mem.home_room === job.room;
+            }
+        }).length;
+        if (creeps_for_room > 3 && room.energyAvailable !== room.energyCapacityAvailable) {
+            return 0;
+        } else {
+            return SpawnJob.default_rate(job, spawn);
+        }
+    });
 }
 
 // Factory update function

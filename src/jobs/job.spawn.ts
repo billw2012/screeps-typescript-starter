@@ -53,9 +53,9 @@ export function construct(type: string, factory: string, room: string, x: number
     return base;
 }
 
-function default_rate(this_: Data, spawn: Spawn): number {
+export function default_rate(this_: Data, spawn: Spawn): number {
     // Check how much more energy we have than is required
-    const energy_diff = spawn.energy - BodySpec.get_min_cost(this_.body_spec);
+    const energy_diff = spawn.room.energyAvailable - BodySpec.get_min_cost(this_.body_spec);
     // If we don't have the minimum then return failure
     if (energy_diff <= 0) {
         return 0;
@@ -83,6 +83,7 @@ export function assign(this_: Data, rate: (job: Data, spawn: Spawn) => number = 
         const mem = CreepMemory.get(creep);
         return (mem.home_room === this_.room && mem.role === this_.role) ? 1 : 0;
     });
+
     // Clamp against the limit in settings
     if (role_in_room > Settings.get().spawner.per_room_limits[this_.role]) {
         return false;

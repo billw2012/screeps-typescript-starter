@@ -12,6 +12,10 @@ export function clamp(x: number, a: number, b: number): number {
     return Math.max(Math.min(x, b), a);
 }
 
+export function random_index(max: number) {
+    return Math.min(Math.floor(Math.random() * max), max - 1);
+}
+
 export function same_room_pos(a: RoomPosition, b: RoomPosition): boolean {
     return a.roomName === b.roomName && a.x === b.x && a.y === b.y;
 }
@@ -57,13 +61,15 @@ export function box_search(x: number, y: number, pred: (x: number, y: number) =>
     return null;
 }
 
-export function cross_is_clear(x: number, y: number, room: Room) {
-    const check_pos = (x_: number, y_: number): boolean =>
-        x_ > 1 && x_ < 48 && y_ > 1 && y_ < 48 &&
-        no_wall(x_, y_, room) &&
-        room.lookForAt(LOOK_STRUCTURES, x_, y_).length === 0 &&
-        room.lookForAt(LOOK_CONSTRUCTION_SITES, x_, y_).length === 0;
-    return check_pos(x - 1, y) && check_pos(x, y) && check_pos(x + 1, y) && check_pos(x, y - 1) && check_pos(x, y + 1);
+export function pos_is_clear(x: number, y: number, room: Room): boolean {
+    return not_at_edge(x, y) &&
+        no_wall(x, y, room) &&
+        room.lookForAt(LOOK_STRUCTURES, x, y).length === 0 &&
+        room.lookForAt(LOOK_CONSTRUCTION_SITES, x, y).length === 0;
+}
+
+export function cross_is_clear(x: number, y: number, room: Room): boolean {
+    return pos_is_clear(x - 1, y, room) && pos_is_clear(x, y, room) && pos_is_clear(x + 1, y, room) && pos_is_clear(x, y - 1, room) && pos_is_clear(x, y + 1, room);
 }
 
 export function terrain_in_area(x: number, y: number, room: Room, size: number, filter: (t: LookAtResultWithPos) => boolean): LookAtResultWithPos[] {

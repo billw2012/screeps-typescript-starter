@@ -5,6 +5,8 @@ import { ROLE_NAME } from "jobs/job.spawn.harvester";
 import { log } from "log";
 import * as CreepMemory from "memory/creep";
 import * as RoomMemory from "memory/room";
+// import * as utils from "utils";
+import * as pos from "pos";
 import * as Settings from "settings";
 
 export const FACTORY_NAME: string = "harvest_factory";
@@ -26,7 +28,7 @@ const state_update = {
     [State.SELECT_SOURCE]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => search_for_source(job, creep, mem, () => job.active = false, () => mem.state = State.GO_TO_SOURCE),
     [State.GO_TO_SOURCE]: (_job: Job.Data, creep: Creep, mem: HarvesterMemory) => go_to_source(creep, mem, () => mem.state = State.HARVEST),
     [State.HARVEST]: (_job: Job.Data, creep: Creep, mem: HarvesterMemory) => harvest(creep, mem, () => mem.state = State.SELECT_TARGET, () => mem.state = State.SELECT_SOURCE),
-    [State.SELECT_TARGET]: (job: Job.Data, _creep: Creep, mem: HarvesterMemory) => select_target(job, mem, () => mem.state = State.DEPOSIT_TO_TARGET, () => mem.state = State.BUILD_TARGET),
+    [State.SELECT_TARGET]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => select_target(job, creep, mem, () => mem.state = State.DEPOSIT_TO_TARGET, () => mem.state = State.BUILD_TARGET),
     [State.BUILD_TARGET]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => build_target(creep, mem, () => job.active = false, () => mem.state = State.SELECT_TARGET),
     [State.DEPOSIT_TO_TARGET]: (job: Job.Data, creep: Creep, mem: HarvesterMemory) => deposit_to_target(creep, mem, () => mem.state = State.SELECT_TARGET, () => job.active = false)
 };
@@ -48,9 +50,9 @@ export function log_progress(job: JobCreep.Data, creep: Creep, mem: HarvesterMem
 }
 
 export function select_source(job: Job.Data, _harvester: Creep): Source | undefined {
-    const pos = Job.get_pos(job) as RoomPosition;
-    if (pos) {
-        const sources = pos.lookFor(LOOK_SOURCES);
+    const p = Job.get_pos(job) as RoomPosition;
+    if (p) {
+        const sources = p.lookFor(LOOK_SOURCES);
         if (sources) {
             return sources[0] as Source;
         }
@@ -113,42 +115,66 @@ export function harvest(creep: Creep, mem: CreepMemory.Data,
     }
 }
 
-function select_target(job: Job.Data, mem: CreepMemory.Data, state_change_deposit_to_target: () => void, state_change_build_target: () => void): void {
+function select_target(job: Job.Data, creep: Creep, mem: CreepMemory.Data, state_change_deposit_to_target: () => void, state_change_build_target: () => void): void {
     // Target selection:
     // If controller downgrade in less than x ticks then controller
     // Otherwise empty extension
     // Otherwise empty spawn
     // Otherwise build
     // Otherwise controller
+    enum TargetType {
+        Build,
+        Deposit
+    }
+    interface CreepTarget {
+        id: string;
+        type: TargetType;
+        dist: number;
+        others: number;
+        priority: number;
+    }
+    interface ExistingTargets {
+        [key: string]: number;
+    }
+    const creep_targets: ExistingTargets = _.countBy(_.filter(JobCreep.get_active_creeps(ROLE_NAME), (creep_: Creep) => {
+        const mem_ = get_mem(creep_);
+        return mem_.state === State.DEPOSIT_TO_TARGET || mem_.state === State.BUILD_TARGET;
+    }), (creep_: Creep) => get_mem(creep_).target);
+
     const room = Game.rooms[job.room];
-    const settings = Settings.get().harvester;
-    if (room.controller && room.controller.my && room.controller.ticksToDowngrade < settings.controller_downgrade_ticks) {
-        mem.target = room.controller.id;
-        state_change_deposit_to_target();
-        return;
+    // const settings = Settings.get().harvester;
+    const targets: CreepTarget[] = [];
+    const add_creep_target = (obj: RoomObject, id: string, type: TargetType, priority: number = 5) =>
+        targets.push({
+            dist: pos.dist_2(pos.get_pos(creep.pos), pos.get_pos(obj.pos)),
+            id,
+            others: creep_targets[id] ? creep_targets[id] : 0,
+            priority,
+            type
+        });
+    if (room.controller && room.controller.my && room.controller.ticksToDowngrade < CONTROLLER_DOWNGRADE[room.controller.level] * 0.75) {
+        add_creep_target(room.controller, room.controller.id, TargetType.Deposit, 1);
     }
-    const extensions = room.find(FIND_MY_STRUCTURES, { filter: (str: Structure) => str.structureType === STRUCTURE_EXTENSION && (str as StructureExtension).energy < (str as StructureExtension).energyCapacity }) as StructureExtension[];
-    if (extensions.length > 0) {
-        mem.target = extensions[0].id;
-        state_change_deposit_to_target();
-        return;
-    }
-    const spawns = room.find(FIND_MY_SPAWNS, { filter: (spawn: Spawn) => spawn.energy < spawn.energyCapacity }) as Spawn[];
-    if (spawns.length > 0) {
-        mem.target = spawns[0].id;
-        state_change_deposit_to_target();
-        return;
-    }
-    const sites = _.sortBy(room.find(FIND_MY_CONSTRUCTION_SITES), (site: ConstructionSite) => site.progressTotal - site.progress) as ConstructionSite[];
-    if (sites.length > 0) {
-        mem.target = sites[0].id;
-        state_change_build_target();
-        return;
-    }
+    _.forEach(room.find(FIND_MY_STRUCTURES, { filter: (str: Structure) => str.structureType === STRUCTURE_EXTENSION && (str as StructureExtension).energy < (str as StructureExtension).energyCapacity }) as StructureExtension[],
+        (ext: StructureExtension) => add_creep_target(ext, ext.id, TargetType.Deposit, 2));
+
+    _.forEach(room.find(FIND_MY_SPAWNS, { filter: (spawn: Spawn) => spawn.energy < spawn.energyCapacity }) as Spawn[],
+        (spawn: Spawn) => add_creep_target(spawn, spawn.id, TargetType.Deposit, 3));
+
+    _.forEach(room.find(FIND_MY_CONSTRUCTION_SITES) as ConstructionSite[],
+        (site: ConstructionSite) => add_creep_target(site, site.id, TargetType.Build, 4));
+
     if (room.controller && room.controller.my) {
-        mem.target = room.controller.id;
-        state_change_deposit_to_target();
-        return;
+        add_creep_target(room.controller, room.controller.id, TargetType.Deposit, 5);
+    }
+    if (targets.length > 0) {
+        const target = _.sortByAll(targets, ["priority", "others", "dist"])[0];
+        mem.target = target.id;
+        if (target.type === TargetType.Deposit) {
+            state_change_deposit_to_target();
+        } else {
+            state_change_build_target();
+        }
     }
 }
 

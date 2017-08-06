@@ -1,10 +1,10 @@
 import { JobFactory } from "jobs/factory";
 import * as Job from "jobs/job";
 import * as JobConstruct from "jobs/job.construct";
+import * as RoomMemory from "memory/room";
 import * as pos from "pos";
 import * as utils from "utils";
 
-// ************************* FILL IN HERE ******************************
 export const FACTORY_NAME: string = "construct_extension_factory";
 export const JOB_NAME: string = "construct_extension_job";
 export const STRUCTURE_NAME: string = STRUCTURE_EXTENSION;
@@ -22,19 +22,19 @@ function get_first_spawn(room: Room): Spawn | null {
     return spawns[0];
 }
 
-function check_pos(x: number, y: number, room: Room): boolean {
-    return utils.cross_is_clear(x, y, room);
-}
-
 // Factory update function
 function update(this_: Job.Data): void {
     JobConstruct.update(this_ as JobConstruct.Data, (_job: JobConstruct.Data): RoomPosition | null => {
         const room = Game.rooms[this_.room];
-        const spawn = get_first_spawn(room);
-        if (spawn) {
-            const found_pos = utils.box_search(spawn.pos.x, spawn.pos.y, (x, y) => check_pos(x, y, room), 1, 2);
-            if (found_pos) {
-                return pos.room_pos(found_pos, room);
+        const room_metadata = RoomMemory.get_metadata(room);
+        if (RoomMemory.is_metadata_ready(room, RoomMemory.MetadataFlags.Extensions)) {
+            const spawn = get_first_spawn(room);
+            if (spawn) {
+                const found_pos = _.find(room_metadata.extensions, (p: pos.Pos) => utils.pos_is_clear(p.x, p.y, room));
+                // utils.box_search(spawn.pos.x, spawn.pos.y, (x, y) => check_pos(x, y, room), 1, 2);
+                if (found_pos) {
+                    return pos.room_pos(found_pos, room);
+                }
             }
         }
 
@@ -54,11 +54,6 @@ function generate_new_jobs(_active_jobs: Job.Data[]): Job.Data[] {
         if (curr.length + under_construction.length < max) {
             new_jobs.push(JobConstruct.construct_auto_pos(JOB_NAME, FACTORY_NAME, room.name, STRUCTURE_NAME));
         }
-        // const jobs_in_room = _.sum(active_jobs, (job: Job.Data) => (job.room === room.name) ? 1 : 0);
-        // const required_jobs = max - curr.length - jobs_in_room;
-        // for (let idx = 0; idx < required_jobs; ++idx) {
-        //    new_jobs.push(JobConstruct.construct_auto_pos(JOB_NAME, FACTORY_NAME, room.name, STRUCTURE_NAME));
-        // }
     });
     return new_jobs;
 }
